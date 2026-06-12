@@ -144,7 +144,14 @@ function Workspace() {
           {tab === "compliance" && active && (
             <div className="space-y-3">
               <div className="flex flex-col items-center justify-center py-4">
-                <Ring value={active.compliance_score ?? 0} />
+                {score.isPending ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <AiSpinner size={48} />
+                    <span className="text-[11px] text-slate-500">Calculating…</span>
+                  </div>
+                ) : (
+                  <Ring value={active.compliance_score ?? 0} />
+                )}
                 <button onClick={() => score.mutate()} className="mt-3 inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:bg-accent">
                   {score.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Re-score
                 </button>
@@ -163,10 +170,13 @@ function Workspace() {
           )}
           {tab === "comments" && (
             <div className="space-y-2">
+              {(comments.data ?? []).length === 0 && (
+                <EmptyState icon={MessageCircle} title="No comments yet" hint="Start the conversation" />
+              )}
               {(comments.data ?? []).map((c) => (
                 <div key={c.id} className="rounded-md border border-border p-2">
                   <div className="text-foreground">{c.text}</div>
-                  <div className="mt-1 text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleString()}</div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</div>
                 </div>
               ))}
               {can.comment(role) && <form onSubmit={(e) => { e.preventDefault(); if (comment) sendComment.mutate(); }} className="flex gap-1">
