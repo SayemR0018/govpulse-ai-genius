@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { aiText } from "@/lib/ai-text.server";
 
 const requirementSchema = z.object({
   text_snippet: z.string(),
@@ -55,11 +54,13 @@ export const generateSectionDraft = createServerFn({ method: "POST" })
       .eq("rfp_id", section.rfp_id)
       .limit(20);
     const reqList = (reqs ?? []).map((r) => `- [${r.risk_level}] ${r.text_snippet}`).join("\n");
-    const draft = await aiText(
-      key,
-      `Write a concise, persuasive draft for the proposal section titled "${section.section_name}". Address these requirements:\n${reqList}\n\n${data.instructions ?? ""}`,
-      "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
-    );
+    const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+    const gateway = createLovableAiGatewayProvider(key);
+    const { text: draft } = await generateText({
+      model: gateway(DEFAULT_MODEL),
+      system: "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
+      prompt: `Write a concise, persuasive draft for the proposal section titled "${section.section_name}". Address these requirements:\n${reqList}\n\n${data.instructions ?? ""}`,
+    });
     await context.supabase.from("proposal_sections").update({ ai_draft: draft }).eq("id", data.sectionId);
     return { draft };
   });
@@ -70,11 +71,13 @@ export const improveTone = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
-    const out = await aiText(
-      key,
-      `Rewrite the following passage in a ${data.tone} tone, preserving meaning and length:\n\n${data.text}`,
-      "You are an expert proposal editor. Return only the rewritten text — no preamble.",
-    );
+    const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+    const gateway = createLovableAiGatewayProvider(key);
+    const { text: out } = await generateText({
+      model: gateway(DEFAULT_MODEL),
+      system: "You are an expert proposal editor. Return only the rewritten text — no preamble.",
+      prompt: `Rewrite the following passage in a ${data.tone} tone, preserving meaning and length:\n\n${data.text}`,
+    });
     return { text: out };
   });
 
@@ -84,11 +87,13 @@ export const autocomplete = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
-    const out = await aiText(
-      key,
-      `Continue the following proposal passage with 1-2 additional sentences. Maintain voice. Return only the new sentences:\n\n${data.precedingText.slice(-1500)}`,
-      "You are a proposal-writing assistant.",
-    );
+    const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+    const gateway = createLovableAiGatewayProvider(key);
+    const { text: out } = await generateText({
+      model: gateway(DEFAULT_MODEL),
+      system: "You are a proposal-writing assistant.",
+      prompt: `Continue the following proposal passage with 1-2 additional sentences. Maintain voice. Return only the new sentences:\n\n${data.precedingText.slice(-1500)}`,
+    });
     return { text: out };
   });
 
