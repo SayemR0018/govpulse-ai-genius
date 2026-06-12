@@ -41,6 +41,8 @@ export const generateSectionDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ sectionId: z.string().uuid(), instructions: z.string().optional() }).parse(i))
   .handler(async ({ data, context }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY missing");
     const { data: section, error } = await context.supabase
       .from("proposal_sections")
       .select("section_name, rfp_id")
@@ -54,6 +56,7 @@ export const generateSectionDraft = createServerFn({ method: "POST" })
       .limit(20);
     const reqList = (reqs ?? []).map((r) => `- [${r.risk_level}] ${r.text_snippet}`).join("\n");
     const draft = await aiText(
+      key,
       `Write a concise, persuasive draft for the proposal section titled "${section.section_name}". Address these requirements:\n${reqList}\n\n${data.instructions ?? ""}`,
       "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
     );
@@ -65,7 +68,10 @@ export const improveTone = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ text: z.string().min(1), tone: z.string().default("authoritative and concise") }).parse(i))
   .handler(async ({ data }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY missing");
     const out = await aiText(
+      key,
       `Rewrite the following passage in a ${data.tone} tone, preserving meaning and length:\n\n${data.text}`,
       "You are an expert proposal editor. Return only the rewritten text — no preamble.",
     );
@@ -76,7 +82,10 @@ export const autocomplete = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ precedingText: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY missing");
     const out = await aiText(
+      key,
       `Continue the following proposal passage with 1-2 additional sentences. Maintain voice. Return only the new sentences:\n\n${data.precedingText.slice(-1500)}`,
       "You are a proposal-writing assistant.",
     );
