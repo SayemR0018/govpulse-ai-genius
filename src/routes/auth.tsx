@@ -27,10 +27,11 @@ function AuthPage() {
           options: { emailRedirectTo: `${window.location.origin}/` },
         });
         if (error) throw error;
-        toast.success("Account created. Signing you in…");
+        toast.success("Welcome to GovPulse AI! Your workspace is ready.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        toast.success("Signed in");
       }
       navigate({ to: "/dashboard" });
     } catch (err) {
