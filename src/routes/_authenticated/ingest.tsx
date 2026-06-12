@@ -4,12 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { listRfps, getRfp } from "@/lib/rfp.functions";
 import { extractRequirements } from "@/lib/ai.functions";
 import { useState } from "react";
-import { Upload, Sparkles, Loader2 } from "lucide-react";
+import { Upload, Sparkles, Loader2, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState, ErrorCard, AiSpinner, Skeleton } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/_authenticated/ingest")({
   head: () => ({ meta: [{ title: "Ingest RFP — GovPulse AI" }] }),
   component: IngestPage,
+  errorComponent: ({ error, reset }) => <ErrorCard error={error as Error} reset={reset} />,
 });
 
 const SAMPLE = `SECTION L — INSTRUCTIONS TO OFFERORS
@@ -39,11 +41,14 @@ function IngestPage() {
   const extract = useMutation({
     mutationFn: () => extractFn({ data: { rfpId: selectedRfp!, documentText: text } }),
     onSuccess: (res) => {
-      toast.success(`Extracted ${res.count} requirements`);
+      const pages = Math.max(1, Math.ceil(text.length / 3000));
+      toast.success(`Extracted ${res.count} requirements from ${pages} page${pages > 1 ? "s" : ""}`);
       qc.invalidateQueries({ queryKey: ["rfp", selectedRfp] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Extraction failed"),
   });
+  const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const pageCount = Math.max(1, Math.ceil(text.length / 3000));
 
   return (
     <div className="space-y-6">
@@ -78,18 +83,25 @@ function IngestPage() {
             <button
               onClick={() => extract.mutate()}
               disabled={extract.isPending || text.length < 50}
-              className="mt-3 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+              className="mt-3 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
             >
-              {extract.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {extract.isPending ? <AiSpinner /> : <Sparkles className="h-4 w-4" />}
               Extract with AI
             </button>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4">
-            <h2 className="mb-3 text-sm font-medium">Extracted Requirements</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium">Extracted Requirements</h2>
+              <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{pageCount} pages</span>
+                <span>{wordCount.toLocaleString()} words</span>
+              </div>
+            </div>
             <div className="space-y-2">
-              {(detail.data?.requirements ?? []).length === 0 && (
-                <div className="text-xs text-muted-foreground">No requirements yet — run Extract with AI.</div>
+              {detail.isLoading && <Skeleton className="h-24 w-full" />}
+              {!detail.isLoading && (detail.data?.requirements ?? []).length === 0 && (
+                <EmptyState icon={Upload} title="No requirements yet" hint="Paste text and run Extract with AI" />
               )}
               {(detail.data?.requirements ?? []).map((r) => (
                 <div key={r.id} className="rounded-md border border-border bg-background/40 p-2 text-xs">

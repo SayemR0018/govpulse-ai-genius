@@ -6,10 +6,13 @@ import { useState } from "react";
 import { DollarSign, TrendingUp, AlertTriangle, CalendarClock, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useUiStore, can } from "@/stores/ui";
+import { Skeleton, EmptyState, ErrorCard, Avatar } from "@/components/ui-kit";
+import { formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — GovPulse AI" }] }),
   component: Dashboard,
+  errorComponent: ({ error, reset }) => <ErrorCard error={error as Error} reset={reset} />,
 });
 
 const COLUMNS = [
@@ -31,18 +34,20 @@ function Dashboard() {
 
   const kpis = useQuery({ queryKey: ["kpis"], queryFn: () => kpisFn() });
   const rfps = useQuery({ queryKey: ["rfps"], queryFn: () => rfpsFn() });
-  const activity = useQuery({ queryKey: ["activity"], queryFn: () => activityFn() });
+  const activity = useQuery({ queryKey: ["activity"], queryFn: () => activityFn(), refetchInterval: 30_000 });
 
   const moveMutation = useMutation({
     mutationFn: (vars: { rfpId: string; status: typeof COLUMNS[number]["key"] }) =>
       updateStatus({ data: vars }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["rfps"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rfps"] }); qc.invalidateQueries({ queryKey: ["activity"] }); toast.success("Status updated"); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Update failed"),
   });
 
   const [newTitle, setNewTitle] = useState("");
   const create = useMutation({
     mutationFn: () => createRfpFn({ data: { title: newTitle, due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) } }),
-    onSuccess: () => { setNewTitle(""); qc.invalidateQueries({ queryKey: ["rfps"] }); toast.success("RFP created"); },
+    onSuccess: () => { setNewTitle(""); qc.invalidateQueries({ queryKey: ["rfps"] }); qc.invalidateQueries({ queryKey: ["activity"] }); toast.success("RFP created"); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not create RFP"),
   });
 
   return (
@@ -66,15 +71,26 @@ function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Kpi icon={DollarSign} label="Active bids value" value={`$${(kpis.data?.totalValue ?? 0).toLocaleString()}`} />
-        <Kpi icon={TrendingUp} label="Avg win probability" value={`${kpis.data?.avgWin ?? 0}%`} tone="success" />
-        <Kpi icon={AlertTriangle} label="Open high-risk flags" value={String(kpis.data?.flags ?? 0)} tone="warn" />
-        <Kpi icon={CalendarClock} label="Days to next due" value={kpis.data?.daysToNearest === null || kpis.data === undefined ? "—" : String(kpis.data.daysToNearest)} />
+        {kpis.isLoading ? (
+          <>{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</>
+        ) : (
+          <>
+            <Kpi icon={DollarSign} label="Active bids value" value={`$${(kpis.data?.totalValue ?? 0).toLocaleString()}`} />
+            <Kpi icon={TrendingUp} label="Avg win probability" value={`${kpis.data?.avgWin ?? 0}%`} tone="success" />
+            <Kpi icon={AlertTriangle} label="Open high-risk flags" value={String(kpis.data?.flags ?? 0)} tone="warn" />
+            <Kpi icon={CalendarClock} label="Days to next due" value={kpis.data?.daysToNearest == null ? "—" : String(kpis.data.daysToNearest)} />
+          </>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="rounded-2xl border border-border bg-card p-4">
           <h2 className="mb-3 text-sm font-medium text-muted-foreground">RFP Pipeline</h2>
+          {rfps.isLoading && <Skeleton className="h-40 w-full" />}
+          {!rfps.isLoading && (rfps.data ?? []).length === 0 && (
+            <EmptyState icon={Plus} title="No active RFPs" hint="Create your first RFP above to start the pipeline" />
+          )}
+          {!rfps.isLoading && (rfps.data ?? []).length > 0 && (
           <div className="grid grid-cols-5 gap-3">
             {COLUMNS.map((col) => (
               <div key={col.key}
@@ -104,23 +120,30 @@ function Dashboard() {
               </div>
             ))}
           </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-4">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Sparkles className="h-4 w-4 text-ai" /> AI Activity
           </h2>
-          <ul className="space-y-2 text-xs">
-            {(activity.data ?? []).length === 0 && (
-              <li className="text-muted-foreground">No activity yet. Create an RFP to get started.</li>
-            )}
-            {(activity.data ?? []).map((a) => (
-              <li key={a.id} className="rounded-md border border-border bg-background/40 p-2">
-                <div className="text-foreground">{a.message}</div>
-                <div className="mt-1 text-[10px] text-muted-foreground">{new Date(a.created_at).toLocaleString()} · {a.actor}</div>
-              </li>
-            ))}
-          </ul>
+          {activity.isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : (activity.data ?? []).length === 0 ? (
+            <EmptyState icon={Sparkles} title="No activity yet" hint="Create an RFP to get started" />
+          ) : (
+            <ul className="space-y-2 text-xs">
+              {(activity.data ?? []).map((a) => (
+                <li key={a.id} className="flex items-start gap-2 rounded-md border border-border bg-background/40 p-2">
+                  <Avatar name={a.actor} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-foreground">{a.message}</div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(a.created_at), { addSuffix: true })} · {a.actor}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

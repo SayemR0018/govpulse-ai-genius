@@ -3,10 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listRfps } from "@/lib/rfp.functions";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Skeleton, EmptyState, ErrorCard } from "@/components/ui-kit";
+import { BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Analytics — GovPulse AI" }] }),
   component: Analytics,
+  errorComponent: ({ error, reset }) => <ErrorCard error={error as Error} reset={reset} />,
 });
 
 function Analytics() {
@@ -22,6 +25,11 @@ function Analytics() {
         <p className="text-sm text-muted-foreground">Pipeline value and win probability by RFP.</p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
+        {q.isLoading && (<><Skeleton className="h-72" /><Skeleton className="h-72" /></>)}
+        {!q.isLoading && data.length === 0 && (
+          <div className="lg:col-span-2"><EmptyState icon={BarChart3} title="No data yet" hint="Create an RFP to populate analytics" /></div>
+        )}
+        {!q.isLoading && data.length > 0 && (<>
         <div className="h-72 rounded-2xl border border-border bg-card p-4">
           <h3 className="mb-2 text-sm font-medium">Win probability</h3>
           <ResponsiveContainer width="100%" height="90%">
@@ -46,6 +54,7 @@ function Analytics() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        </>)}
       </div>
     </div>
   );

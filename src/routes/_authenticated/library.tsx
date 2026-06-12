@@ -3,11 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listLibrary, createLibraryItem } from "@/lib/rfp.functions";
 import { useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Library as LibIcon } from "lucide-react";
+import { toast } from "sonner";
+import { Skeleton, EmptyState, ErrorCard } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/_authenticated/library")({
   head: () => ({ meta: [{ title: "Content Library — GovPulse AI" }] }),
   component: LibraryPage,
+  errorComponent: ({ error, reset }) => <ErrorCard error={error as Error} reset={reset} />,
 });
 
 function LibraryPage() {
@@ -21,7 +24,8 @@ function LibraryPage() {
 
   const create = useMutation({
     mutationFn: () => createFn({ data: { title, content_body: body, tags: [] } }),
-    onSuccess: () => { setTitle(""); setBody(""); qc.invalidateQueries({ queryKey: ["library"] }); },
+    onSuccess: () => { setTitle(""); setBody(""); qc.invalidateQueries({ queryKey: ["library"] }); toast.success("Saved to library"); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not save"),
   });
 
   const items = (q.data ?? []).filter((i) =>
@@ -40,6 +44,7 @@ function LibraryPage() {
           className="w-full rounded-md border border-input bg-card py-2 pl-9 pr-3 text-sm" />
       </div>
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {q.isLoading && Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         {items.map((i) => (
           <div key={i.id} className="rounded-2xl border border-border bg-card p-4">
             <div className="text-sm font-medium">{i.title}</div>
@@ -47,7 +52,11 @@ function LibraryPage() {
             <div className="mt-2 text-[10px] text-muted-foreground">Reused {i.reuse_count} times</div>
           </div>
         ))}
-        {items.length === 0 && <div className="text-sm text-muted-foreground">No items yet.</div>}
+        {!q.isLoading && items.length === 0 && (
+          <div className="md:col-span-2 lg:col-span-3">
+            <EmptyState icon={LibIcon} title="No saved content" hint="Save a section to get started" />
+          </div>
+        )}
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); if (title && body) create.mutate(); }}
