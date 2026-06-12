@@ -14,16 +14,419 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_log: {
+        Row: {
+          actor: string
+          created_at: string
+          id: string
+          message: string
+          org_id: string
+        }
+        Insert: {
+          actor?: string
+          created_at?: string
+          id?: string
+          message: string
+          org_id: string
+        }
+        Update: {
+          actor?: string
+          created_at?: string
+          id?: string
+          message?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_library: {
+        Row: {
+          content_body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          reuse_count: number
+          tags: string[]
+          title: string
+        }
+        Insert: {
+          content_body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          reuse_count?: number
+          tags?: string[]
+          title: string
+        }
+        Update: {
+          content_body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          reuse_count?: number
+          tags?: string[]
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_library_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_members: {
+        Row: {
+          joined_at: string
+          org_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          org_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          org_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          plan_tier: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          plan_tier?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          plan_tier?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          current_org_id: string | null
+          current_role_preview: Database["public"]["Enums"]["app_role"] | null
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          current_org_id?: string | null
+          current_role_preview?: Database["public"]["Enums"]["app_role"] | null
+          display_name?: string | null
+          id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          current_org_id?: string | null
+          current_role_preview?: Database["public"]["Enums"]["app_role"] | null
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_current_org_id_fkey"
+            columns: ["current_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposal_sections: {
+        Row: {
+          ai_draft: string | null
+          assigned_to: string | null
+          compliance_score: number | null
+          compliance_status: Database["public"]["Enums"]["compliance_state"]
+          created_at: string
+          human_edits: string | null
+          id: string
+          order_index: number
+          rfp_id: string
+          section_name: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          ai_draft?: string | null
+          assigned_to?: string | null
+          compliance_score?: number | null
+          compliance_status?: Database["public"]["Enums"]["compliance_state"]
+          created_at?: string
+          human_edits?: string | null
+          id?: string
+          order_index?: number
+          rfp_id: string
+          section_name: string
+          updated_at?: string
+          version_number?: number
+        }
+        Update: {
+          ai_draft?: string | null
+          assigned_to?: string | null
+          compliance_score?: number | null
+          compliance_status?: Database["public"]["Enums"]["compliance_state"]
+          created_at?: string
+          human_edits?: string | null
+          id?: string
+          order_index?: number
+          rfp_id?: string
+          section_name?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_sections_rfp_id_fkey"
+            columns: ["rfp_id"]
+            isOneToOne: false
+            referencedRelation: "rfp_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfp_projects: {
+        Row: {
+          budget: number | null
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          id: string
+          issuing_agency: string | null
+          org_id: string
+          status: Database["public"]["Enums"]["rfp_status"]
+          title: string
+          updated_at: string
+          win_probability: number | null
+        }
+        Insert: {
+          budget?: number | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          issuing_agency?: string | null
+          org_id: string
+          status?: Database["public"]["Enums"]["rfp_status"]
+          title: string
+          updated_at?: string
+          win_probability?: number | null
+        }
+        Update: {
+          budget?: number | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          issuing_agency?: string | null
+          org_id?: string
+          status?: Database["public"]["Enums"]["rfp_status"]
+          title?: string
+          updated_at?: string
+          win_probability?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfp_projects_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfp_requirements: {
+        Row: {
+          assigned_user_id: string | null
+          created_at: string
+          id: string
+          rfp_id: string
+          risk_level: Database["public"]["Enums"]["risk_level"]
+          status: Database["public"]["Enums"]["req_status"]
+          text_snippet: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          created_at?: string
+          id?: string
+          rfp_id: string
+          risk_level?: Database["public"]["Enums"]["risk_level"]
+          status?: Database["public"]["Enums"]["req_status"]
+          text_snippet: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          created_at?: string
+          id?: string
+          rfp_id?: string
+          risk_level?: Database["public"]["Enums"]["risk_level"]
+          status?: Database["public"]["Enums"]["req_status"]
+          text_snippet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfp_requirements_rfp_id_fkey"
+            columns: ["rfp_id"]
+            isOneToOne: false
+            referencedRelation: "rfp_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      section_versions: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          section_id: string
+          version_number: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          section_id: string
+          version_number: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          section_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "section_versions_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          org_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_comments: {
+        Row: {
+          created_at: string
+          id: string
+          section_id: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          section_id: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          section_id?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_comments_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "proposal_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _org: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _uid: string
+        }
+        Returns: boolean
+      }
+      is_org_member: { Args: { _org: string; _uid: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "proposal_manager" | "sme" | "compliance_auditor"
+      compliance_state: "draft" | "approved" | "rejected" | "needs_review"
+      req_status: "pending" | "met" | "warning"
+      rfp_status: "ingestion" | "parsing" | "drafting" | "review" | "submitted"
+      risk_level: "high" | "med" | "low"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +553,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["proposal_manager", "sme", "compliance_auditor"],
+      compliance_state: ["draft", "approved", "rejected", "needs_review"],
+      req_status: ["pending", "met", "warning"],
+      rfp_status: ["ingestion", "parsing", "drafting", "review", "submitted"],
+      risk_level: ["high", "med", "low"],
+    },
   },
 } as const
