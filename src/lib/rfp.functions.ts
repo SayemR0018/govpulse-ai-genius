@@ -154,17 +154,21 @@ export const saveSectionEdits = createServerFn({ method: "POST" })
     const { data: cur } = await context.supabase
       .from("proposal_sections").select("version_number").eq("id", data.sectionId).single();
     const nextVersion = (cur?.version_number ?? 1) + 1;
-    await context.supabase.from("section_versions").insert({
-      section_id: data.sectionId,
-      content: data.content,
-      version_number: nextVersion,
-      created_by: context.userId,
-    });
+    // Update the section first — RLS will reject unauthorized editors. Only after
+    // a successful update do we record a version, so unauthorized callers can never
+    // pollute section_versions with phantom history.
     const { error } = await context.supabase
       .from("proposal_sections")
       .update({ human_edits: data.content, version_number: nextVersion })
       .eq("id", data.sectionId);
     if (error) throw new Error(error.message);
+    const { error: vErr } = await context.supabase.from("section_versions").insert({
+      section_id: data.sectionId,
+      content: data.content,
+      version_number: nextVersion,
+      created_by: context.userId,
+    });
+    if (vErr) throw new Error(vErr.message);
     return { ok: true, version: nextVersion };
   });
 
