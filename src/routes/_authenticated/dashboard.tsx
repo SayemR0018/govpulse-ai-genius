@@ -5,6 +5,7 @@ import { getDashboardKpis, listRfps, listActivity, updateRfpStatus, createRfp } 
 import { useState } from "react";
 import { DollarSign, TrendingUp, AlertTriangle, CalendarClock, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useUiStore, can } from "@/stores/ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — GovPulse AI" }] }),
@@ -21,6 +22,7 @@ const COLUMNS = [
 
 function Dashboard() {
   const qc = useQueryClient();
+  const role = useUiStore((s) => s.role);
   const kpisFn = useServerFn(getDashboardKpis);
   const rfpsFn = useServerFn(listRfps);
   const activityFn = useServerFn(listActivity);
@@ -50,6 +52,7 @@ function Dashboard() {
           <h1 className="text-2xl font-semibold tracking-tight">Executive Dashboard</h1>
           <p className="text-sm text-muted-foreground">Live view of active bids, compliance posture, and AI activity.</p>
         </div>
+        {can.create(role) && (
         <form onSubmit={(e) => { e.preventDefault(); if (newTitle) create.mutate(); }} className="flex gap-2">
           <input
             value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="New RFP title…"
@@ -59,6 +62,7 @@ function Dashboard() {
             <Plus className="h-4 w-4" /> Create
           </button>
         </form>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
