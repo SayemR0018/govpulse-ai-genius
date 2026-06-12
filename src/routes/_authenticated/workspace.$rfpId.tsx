@@ -6,6 +6,7 @@ import { generateSectionDraft, improveTone, autocomplete, scoreCompliance } from
 import { useEffect, useState } from "react";
 import { Sparkles, Loader2, Wand2, MessageCircle, History, ShieldCheck, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useUiStore, can } from "@/stores/ui";
 
 export const Route = createFileRoute("/_authenticated/workspace/$rfpId")({
   head: () => ({ meta: [{ title: "Drafting Workspace — GovPulse AI" }] }),
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_authenticated/workspace/$rfpId")({
 
 function Workspace() {
   const { rfpId } = Route.useParams();
+  const role = useUiStore((s) => s.role);
   const qc = useQueryClient();
   const getRfpFn = useServerFn(getRfp);
   const saveFn = useServerFn(saveSectionEdits);
