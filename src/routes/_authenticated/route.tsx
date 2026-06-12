@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, FileInput, Library, BarChart3, Settings, Sparkles, Bell, LogOut } from "lucide-react";
 import { toast } from "sonner";
+import { useUiStore, type RolePreview } from "@/stores/ui";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -25,13 +26,14 @@ const NAV = [
 function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const [role, setRole] = useState<string>("proposal_manager");
+  const role = useUiStore((s) => s.role);
+  const setRole = useUiStore((s) => s.setRole);
 
   useEffect(() => {
     supabase.from("profiles").select("current_role_preview").single().then(({ data }) => {
-      if (data?.current_role_preview) setRole(data.current_role_preview);
+      if (data?.current_role_preview) setRole(data.current_role_preview as RolePreview);
     });
-  }, []);
+  }, [setRole]);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -40,7 +42,7 @@ function AppShell() {
   }
 
   async function switchRole(r: string) {
-    setRole(r);
+    setRole(r as RolePreview);
     await supabase.from("profiles").update({ current_role_preview: r as never }).eq("id", (await supabase.auth.getUser()).data.user!.id);
     toast.success(`Viewing as ${r.replace("_", " ")}`);
   }

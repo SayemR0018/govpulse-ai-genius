@@ -6,6 +6,7 @@ import { generateSectionDraft, improveTone, autocomplete, scoreCompliance } from
 import { useEffect, useState } from "react";
 import { Sparkles, Loader2, Wand2, MessageCircle, History, ShieldCheck, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useUiStore, can } from "@/stores/ui";
 
 export const Route = createFileRoute("/_authenticated/workspace/$rfpId")({
   head: () => ({ meta: [{ title: "Drafting Workspace — GovPulse AI" }] }),
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_authenticated/workspace/$rfpId")({
 
 function Workspace() {
   const { rfpId } = Route.useParams();
+  const role = useUiStore((s) => s.role);
   const qc = useQueryClient();
   const getRfpFn = useServerFn(getRfp);
   const saveFn = useServerFn(saveSectionEdits);
@@ -100,14 +102,19 @@ function Workspace() {
             <h2 className="text-lg font-semibold">{active?.section_name ?? "Loading…"}</h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            <AiBtn icon={Sparkles} label="Draft" loading={draft.isPending} onClick={() => draft.mutate()} />
-            <AiBtn icon={Wand2} label="Improve tone" loading={tone.isPending} onClick={() => tone.mutate()} />
-            <AiBtn icon={Sparkles} label="Autocomplete" loading={complete.isPending} onClick={() => complete.mutate()} />
-            <button onClick={() => save.mutate()} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent">Save</button>
+            {can.editSection(role) && <>
+              <AiBtn icon={Sparkles} label="Draft" loading={draft.isPending} onClick={() => draft.mutate()} />
+              <AiBtn icon={Wand2} label="Improve tone" loading={tone.isPending} onClick={() => tone.mutate()} />
+              <AiBtn icon={Sparkles} label="Autocomplete" loading={complete.isPending} onClick={() => complete.mutate()} />
+              <button onClick={() => save.mutate()} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent">Save</button>
+            </>}
+            {!can.editSection(role) && (
+              <span className="text-[11px] text-muted-foreground">Read-only for {role.replace("_", " ")}</span>
+            )}
           </div>
         </div>
         <textarea
-          value={content} onChange={(e) => setContent(e.target.value)}
+          value={content} onChange={(e) => setContent(e.target.value)} readOnly={!can.editSection(role)}
           className="flex-1 resize-none bg-background p-6 text-sm leading-relaxed focus:outline-none"
           placeholder="Click Draft to generate an AI starting point, or start typing…"
         />
@@ -136,14 +143,14 @@ function Workspace() {
                 </button>
               </div>
               <div className="text-muted-foreground">Auditor actions</div>
-              <div className="flex gap-2">
+              {can.approveReject(role) ? <div className="flex gap-2">
                 <button onClick={() => setCompliance.mutate("approved")} className="inline-flex items-center gap-1 rounded-md bg-success/20 px-2 py-1 text-success">
                   <CheckCircle2 className="h-3 w-3" /> Approve
                 </button>
                 <button onClick={() => setCompliance.mutate("rejected")} className="inline-flex items-center gap-1 rounded-md bg-destructive/20 px-2 py-1 text-destructive">
                   <XCircle className="h-3 w-3" /> Reject
                 </button>
-              </div>
+              </div> : <div className="text-[11px] text-muted-foreground">Only compliance auditors can approve/reject.</div>}
               <div className="text-muted-foreground">Status: <span className="text-foreground">{active.compliance_status}</span></div>
             </div>
           )}
@@ -155,11 +162,11 @@ function Workspace() {
                   <div className="mt-1 text-[10px] text-muted-foreground">{new Date(c.created_at).toLocaleString()}</div>
                 </div>
               ))}
-              <form onSubmit={(e) => { e.preventDefault(); if (comment) sendComment.mutate(); }} className="flex gap-1">
+              {can.comment(role) && <form onSubmit={(e) => { e.preventDefault(); if (comment) sendComment.mutate(); }} className="flex gap-1">
                 <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add comment…"
                   className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs" />
                 <button className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground">Send</button>
-              </form>
+              </form>}
             </div>
           )}
           {tab === "versions" && (

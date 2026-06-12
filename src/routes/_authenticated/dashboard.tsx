@@ -5,6 +5,7 @@ import { getDashboardKpis, listRfps, listActivity, updateRfpStatus, createRfp } 
 import { useState } from "react";
 import { DollarSign, TrendingUp, AlertTriangle, CalendarClock, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useUiStore, can } from "@/stores/ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — GovPulse AI" }] }),
@@ -21,6 +22,7 @@ const COLUMNS = [
 
 function Dashboard() {
   const qc = useQueryClient();
+  const role = useUiStore((s) => s.role);
   const kpisFn = useServerFn(getDashboardKpis);
   const rfpsFn = useServerFn(listRfps);
   const activityFn = useServerFn(listActivity);
@@ -50,6 +52,7 @@ function Dashboard() {
           <h1 className="text-2xl font-semibold tracking-tight">Executive Dashboard</h1>
           <p className="text-sm text-muted-foreground">Live view of active bids, compliance posture, and AI activity.</p>
         </div>
+        {can.create(role) && (
         <form onSubmit={(e) => { e.preventDefault(); if (newTitle) create.mutate(); }} className="flex gap-2">
           <input
             value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="New RFP title…"
@@ -59,6 +62,7 @@ function Dashboard() {
             <Plus className="h-4 w-4" /> Create
           </button>
         </form>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -74,8 +78,9 @@ function Dashboard() {
           <div className="grid grid-cols-5 gap-3">
             {COLUMNS.map((col) => (
               <div key={col.key}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={(e) => { if (can.assign(role)) e.preventDefault(); }}
                 onDrop={(e) => {
+                  if (!can.assign(role)) return;
                   const id = e.dataTransfer.getData("text/plain");
                   if (id) moveMutation.mutate({ rfpId: id, status: col.key });
                 }}
@@ -84,7 +89,7 @@ function Dashboard() {
                 <div className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{col.label}</div>
                 {(rfps.data ?? []).filter((r) => r.status === col.key).map((r) => (
                   <div key={r.id}
-                    draggable
+                    draggable={can.assign(role)}
                     onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
                     className="cursor-grab rounded-md border border-border bg-card p-2 text-xs hover:border-ai active:cursor-grabbing"
                   >
