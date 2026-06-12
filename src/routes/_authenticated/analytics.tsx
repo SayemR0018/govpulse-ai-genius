@@ -5,6 +5,7 @@ import { listRfps } from "@/lib/rfp.functions";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Skeleton, EmptyState, ErrorCard } from "@/components/ui-kit";
 import { BarChart3 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Analytics — GovPulse AI" }] }),
@@ -13,8 +14,10 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 });
 
 function Analytics() {
+  const [mounted, setMounted] = useState(false);
   const fn = useServerFn(listRfps);
   const q = useQuery({ queryKey: ["rfps"], queryFn: () => fn() });
+  useEffect(() => setMounted(true), []);
   const data = (q.data ?? []).map((r) => ({
     name: r.title.slice(0, 14), win: r.win_probability ?? 0, budget: Number(r.budget ?? 0) / 1000,
   }));
@@ -29,7 +32,8 @@ function Analytics() {
         {!q.isLoading && data.length === 0 && (
           <div className="lg:col-span-2"><EmptyState icon={BarChart3} title="No data yet" hint="Create an RFP to populate analytics" /></div>
         )}
-        {!q.isLoading && data.length > 0 && (<>
+        {!q.isLoading && data.length > 0 && !mounted && (<><Skeleton className="h-72" /><Skeleton className="h-72" /></>)}
+        {!q.isLoading && data.length > 0 && mounted && (<>
         <div className="h-72 rounded-2xl border border-border bg-card p-4">
           <h3 className="mb-2 text-sm font-medium">Win probability</h3>
           <ResponsiveContainer width="100%" height="90%">
