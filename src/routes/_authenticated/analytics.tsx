@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listRfps } from "@/lib/rfp.functions";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Skeleton, EmptyState, ErrorCard } from "@/components/ui-kit";
 import { BarChart3 } from "lucide-react";
 
@@ -32,30 +31,33 @@ function Analytics() {
         {!q.isLoading && data.length > 0 && (<>
         <div className="h-72 rounded-2xl border border-border bg-card p-4">
           <h3 className="mb-2 text-sm font-medium">Win probability</h3>
-          <ResponsiveContainer width="100%" height="90%">
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.08)" />
-              <XAxis dataKey="name" stroke="oklch(0.7 0 0)" fontSize={10} />
-              <YAxis stroke="oklch(0.7 0 0)" fontSize={10} />
-              <Tooltip contentStyle={{ background: "oklch(0.215 0.03 264)", border: "1px solid oklch(1 0 0 / 0.1)" }} />
-              <Bar dataKey="win" fill="oklch(0.62 0.18 268)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarList data={data.map((item) => ({ name: item.name, value: item.win, label: `${item.win}%` }))} tone="ai" />
         </div>
         <div className="h-72 rounded-2xl border border-border bg-card p-4">
           <h3 className="mb-2 text-sm font-medium">Budget ($K)</h3>
-          <ResponsiveContainer width="100%" height="90%">
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.08)" />
-              <XAxis dataKey="name" stroke="oklch(0.7 0 0)" fontSize={10} />
-              <YAxis stroke="oklch(0.7 0 0)" fontSize={10} />
-              <Tooltip contentStyle={{ background: "oklch(0.215 0.03 264)", border: "1px solid oklch(1 0 0 / 0.1)" }} />
-              <Bar dataKey="budget" fill="oklch(0.72 0.17 158)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarList data={data.map((item) => ({ name: item.name, value: item.budget, label: `$${Math.round(item.budget)}K` }))} tone="success" />
         </div>
         </>)}
       </div>
+    </div>
+  );
+}
+
+function BarList({ data, tone }: { data: Array<{ name: string; value: number; label: string }>; tone: "ai" | "success" }) {
+  const max = Math.max(...data.map((item) => item.value), 1);
+  const fillClass = tone === "ai" ? "bg-ai" : "bg-success";
+
+  return (
+    <div className="mt-4 space-y-3 text-xs">
+      {data.map((item) => (
+        <div key={`${item.name}-${item.label}`} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3">
+          <span className="truncate text-muted-foreground">{item.name}</span>
+          <div className="h-3 overflow-hidden rounded-full bg-background">
+            <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${Math.max(3, (item.value / max) * 100)}%` }} />
+          </div>
+          <span className="text-right font-medium text-foreground">{item.label}</span>
+        </div>
+      ))}
     </div>
   );
 }

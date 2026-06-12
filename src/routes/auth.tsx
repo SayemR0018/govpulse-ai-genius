@@ -21,10 +21,11 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
+        const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/` : undefined;
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/` },
+          options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
         });
         if (error) throw error;
         toast.success("Welcome to GovPulse AI! Your workspace is ready.");

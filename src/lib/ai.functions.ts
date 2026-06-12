@@ -36,23 +36,12 @@ export const extractRequirements = createServerFn({ method: "POST" })
     return { count: rows.length };
   });
 
-async function aiText(prompt: string, system?: string) {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY missing");
-  const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
-  const gateway = createLovableAiGatewayProvider(key);
-  const { text } = await generateText({
-    model: gateway(DEFAULT_MODEL),
-    system,
-    prompt,
-  });
-  return text;
-}
-
 export const generateSectionDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ sectionId: z.string().uuid(), instructions: z.string().optional() }).parse(i))
   .handler(async ({ data, context }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY missing");
     const { data: section, error } = await context.supabase
       .from("proposal_sections")
       .select("section_name, rfp_id")
@@ -65,10 +54,13 @@ export const generateSectionDraft = createServerFn({ method: "POST" })
       .eq("rfp_id", section.rfp_id)
       .limit(20);
     const reqList = (reqs ?? []).map((r) => `- [${r.risk_level}] ${r.text_snippet}`).join("\n");
-    const draft = await aiText(
-      `Write a concise, persuasive draft for the proposal section titled "${section.section_name}". Address these requirements:\n${reqList}\n\n${data.instructions ?? ""}`,
-      "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
-    );
+    const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+    const gateway = createLovableAiGatewayProvider(key);
+    const { text: draft } = await generateText({
+      model: gateway(DEFAULT_MODEL),
+      system: "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
+      prompt: `Write a concise, persuasive draft for the proposal section titled "${section.section_name}". Address these requirements:\n${reqList}\n\n${data.instructions ?? ""}`,
+    });
     await context.supabase.from("proposal_sections").update({ ai_draft: draft }).eq("id", data.sectionId);
     return { draft };
   });
@@ -77,10 +69,15 @@ export const improveTone = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ text: z.string().min(1), tone: z.string().default("authoritative and concise") }).parse(i))
   .handler(async ({ data }) => {
-    const out = await aiText(
-      `Rewrite the following passage in a ${data.tone} tone, preserving meaning and length:\n\n${data.text}`,
-      "You are an expert proposal editor. Return only the rewritten text — no preamble.",
-    );
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY missing");
+    const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+    const gateway = createLovableAiGatewayProvider(key);
+    const { text: out } = await generateText({
+      model: gateway(DEFAULT_MODEL),
+      system: "You are an expert proposal editor. Return only the rewritten text — no preamble.",
+      prompt: `Rewrite the following passage in a ${data.tone} tone, preserving meaning and length:\n\n${data.text}`,
+    });
     return { text: out };
   });
 
@@ -88,10 +85,15 @@ export const autocomplete = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ precedingText: z.string().min(1) }).parse(i))
   .handler(async ({ data }) => {
-    const out = await aiText(
-      `Continue the following proposal passage with 1-2 additional sentences. Maintain voice. Return only the new sentences:\n\n${data.precedingText.slice(-1500)}`,
-      "You are a proposal-writing assistant.",
-    );
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY missing");
+    const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+    const gateway = createLovableAiGatewayProvider(key);
+    const { text: out } = await generateText({
+      model: gateway(DEFAULT_MODEL),
+      system: "You are a proposal-writing assistant.",
+      prompt: `Continue the following proposal passage with 1-2 additional sentences. Maintain voice. Return only the new sentences:\n\n${data.precedingText.slice(-1500)}`,
+    });
     return { text: out };
   });
 
