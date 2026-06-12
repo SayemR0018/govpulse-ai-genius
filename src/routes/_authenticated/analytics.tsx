@@ -54,6 +54,7 @@ function Analytics() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        </>)}
       </div>
     </div>
   );
