@@ -78,8 +78,9 @@ function Dashboard() {
           <div className="grid grid-cols-5 gap-3">
             {COLUMNS.map((col) => (
               <div key={col.key}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={(e) => { if (can.assign(role)) e.preventDefault(); }}
                 onDrop={(e) => {
+                  if (!can.assign(role)) return;
                   const id = e.dataTransfer.getData("text/plain");
                   if (id) moveMutation.mutate({ rfpId: id, status: col.key });
                 }}
@@ -88,7 +89,7 @@ function Dashboard() {
                 <div className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{col.label}</div>
                 {(rfps.data ?? []).filter((r) => r.status === col.key).map((r) => (
                   <div key={r.id}
-                    draggable
+                    draggable={can.assign(role)}
                     onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
                     className="cursor-grab rounded-md border border-border bg-card p-2 text-xs hover:border-ai active:cursor-grabbing"
                   >
