@@ -2,15 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyProfile } from "@/lib/rfp.functions";
+import { Skeleton, ErrorCard } from "@/components/ui-kit";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — GovPulse AI" }] }),
   component: Settings,
+  errorComponent: ({ error, reset }) => <ErrorCard error={error as Error} reset={reset} />,
 });
 
 function Settings() {
   const fn = useServerFn(getMyProfile);
   const q = useQuery({ queryKey: ["profile"], queryFn: () => fn() });
+  if (q.isLoading) {
+    return <div className="space-y-3"><Skeleton className="h-24" /><Skeleton className="h-24" /><Skeleton className="h-24" /></div>;
+  }
   return (
     <div className="space-y-6">
       <div>
