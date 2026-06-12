@@ -194,7 +194,9 @@ function Workspace() {
                   <div className="mt-1 line-clamp-3 text-muted-foreground">{v.content}</div>
                 </li>
               ))}
-              {(versions.data ?? []).length === 0 && <li className="text-muted-foreground">No saved versions yet.</li>}
+              {(versions.data ?? []).length === 0 && (
+                <li><EmptyState icon={History} title="No versions saved yet" hint="Save the editor to snapshot" /></li>
+              )}
             </ul>
           )}
         </div>
