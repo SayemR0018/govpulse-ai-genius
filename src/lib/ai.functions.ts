@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { generateObject, generateText } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { aiText } from "@/lib/ai-text.server";
 
 const requirementSchema = z.object({
   text_snippet: z.string(),
@@ -35,19 +36,6 @@ export const extractRequirements = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { count: rows.length };
   });
-
-async function aiText(prompt: string, system?: string) {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY missing");
-  const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
-  const gateway = createLovableAiGatewayProvider(key);
-  const { text } = await generateText({
-    model: gateway(DEFAULT_MODEL),
-    system,
-    prompt,
-  });
-  return text;
-}
 
 export const generateSectionDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
