@@ -7,10 +7,13 @@ import { useEffect, useState } from "react";
 import { Sparkles, Loader2, Wand2, MessageCircle, History, ShieldCheck, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useUiStore, can } from "@/stores/ui";
+import { Skeleton, EmptyState, ErrorCard, AiSpinner } from "@/components/ui-kit";
+import { formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/workspace/$rfpId")({
   head: () => ({ meta: [{ title: "Drafting Workspace — GovPulse AI" }] }),
   component: Workspace,
+  errorComponent: ({ error, reset }) => <ErrorCard error={error as Error} reset={reset} />,
 });
 
 function Workspace() {
@@ -78,6 +81,10 @@ function Workspace() {
       <aside className="overflow-auto rounded-2xl border border-border bg-card p-3">
         <h2 className="px-2 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Sections</h2>
         <ul className="space-y-1">
+          {sections.length === 0 && !rfp.isLoading && (
+            <EmptyState icon={History} title="No sections yet" hint="Generate from requirements" />
+          )}
+          {rfp.isLoading && <Skeleton className="h-16 w-full" />}
           {sections.map((s) => {
             const pct = s.compliance_score ?? 0;
             return (
