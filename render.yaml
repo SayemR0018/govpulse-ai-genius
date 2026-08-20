@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: tanstack-start-app
+    env: bun
+    buildCommand: bun install --frozen-lockfile && bun run build
+    startCommand: bun run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
