@@ -56,12 +56,24 @@ function AuthPage() {
           {mode === "signin" ? "Welcome back" : "Create your workspace"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Sign in to your enterprise workspace." : "We'll provision an organization for you."}
+          {mode === "signin"
+            ? "Sign in to your enterprise workspace."
+            : "We'll provision an organization for you."}
         </p>
 
         <div className="mt-6 grid grid-cols-2 gap-2">
-          <button onClick={() => mockSso("Google")} className="rounded-md border border-border px-3 py-2 text-sm hover:bg-accent">Google</button>
-          <button onClick={() => mockSso("Microsoft")} className="rounded-md border border-border px-3 py-2 text-sm hover:bg-accent">Microsoft</button>
+          <button
+            onClick={() => mockSso("Google")}
+            className="rounded-md border border-border px-3 py-2 text-sm hover:bg-accent"
+          >
+            Google
+          </button>
+          <button
+            onClick={() => mockSso("Microsoft")}
+            className="rounded-md border border-border px-3 py-2 text-sm hover:bg-accent"
+          >
+            Microsoft
+          </button>
         </div>
         <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
           <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
@@ -73,7 +85,10 @@ function AuthPage() {
             <div className="relative mt-1">
               <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
-                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -81,12 +96,17 @@ function AuthPage() {
           <label className="block text-sm">
             <span className="text-muted-foreground">Password</span>
             <input
-              type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </label>
           <button
-            type="submit" disabled={loading}
+            type="submit"
+            disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}

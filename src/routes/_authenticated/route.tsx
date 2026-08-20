@@ -1,7 +1,23 @@
-import { createFileRoute, Outlet, redirect, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  Link,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, FileInput, Library, BarChart3, Settings, Sparkles, Bell, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  FileInput,
+  Library,
+  BarChart3,
+  Settings,
+  Sparkles,
+  Bell,
+  LogOut,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useUiStore, type RolePreview } from "@/stores/ui";
 
@@ -30,9 +46,13 @@ function AppShell() {
   const setRole = useUiStore((s) => s.setRole);
 
   useEffect(() => {
-    supabase.from("profiles").select("current_role_preview").single().then(({ data }) => {
-      if (data?.current_role_preview) setRole(data.current_role_preview as RolePreview);
-    });
+    supabase
+      .from("profiles")
+      .select("current_role_preview")
+      .single()
+      .then(({ data }) => {
+        if (data?.current_role_preview) setRole(data.current_role_preview as RolePreview);
+      });
   }, [setRole]);
 
   async function signOut() {
@@ -43,7 +63,10 @@ function AppShell() {
 
   async function switchRole(r: string) {
     setRole(r as RolePreview);
-    await supabase.from("profiles").update({ current_role_preview: r as never }).eq("id", (await supabase.auth.getUser()).data.user!.id);
+    await supabase
+      .from("profiles")
+      .update({ current_role_preview: r as never })
+      .eq("id", (await supabase.auth.getUser()).data.user!.id);
     toast.success(`Viewing as ${r.replace("_", " ")}`);
   }
 
@@ -55,12 +78,16 @@ function AppShell() {
         </div>
         <nav className="flex flex-col gap-1 px-3">
           {NAV.map((n) => {
-            const active = pathname === n.to || (n.to !== "/dashboard" && pathname.startsWith(n.to));
+            const active =
+              pathname === n.to || (n.to !== "/dashboard" && pathname.startsWith(n.to));
             return (
               <Link
-                key={n.to} to={n.to}
+                key={n.to}
+                to={n.to}
                 className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-                  active ? "bg-ai-soft text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  active
+                    ? "bg-ai-soft text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
                 <n.icon className="h-4 w-4" /> {n.label}
@@ -69,7 +96,10 @@ function AppShell() {
           })}
         </nav>
         <div className="mt-auto p-3">
-          <button onClick={signOut} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">
+          <button
+            onClick={signOut}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
             <LogOut className="h-4 w-4" /> Sign out
           </button>
         </div>
@@ -89,7 +119,9 @@ function AppShell() {
               <option value="sme">Subject Matter Expert</option>
               <option value="compliance_auditor">Compliance Auditor</option>
             </select>
-            <button className="rounded-md border border-border p-2 hover:bg-accent"><Bell className="h-4 w-4" /></button>
+            <button className="rounded-md border border-border p-2 hover:bg-accent">
+              <Bell className="h-4 w-4" />
+            </button>
           </div>
         </header>
         <main className="flex-1 overflow-auto p-6">
@@ -99,5 +131,3 @@ function AppShell() {
     </div>
   );
 }
-
-

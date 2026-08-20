@@ -78,10 +78,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "GovPulse AI" },
-      { name: "description", content: "Enterprise grant and RFP response automation for federal contractors." },
+      {
+        name: "description",
+        content: "Enterprise grant and RFP response automation for federal contractors.",
+      },
       { name: "author", content: "GovPulse AI" },
       { property: "og:title", content: "GovPulse AI" },
-      { property: "og:description", content: "Enterprise grant and RFP response automation for federal contractors." },
+      {
+        property: "og:description",
+        content: "Enterprise grant and RFP response automation for federal contractors.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@GovPulseAI" },

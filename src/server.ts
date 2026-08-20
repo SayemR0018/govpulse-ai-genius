@@ -3,7 +3,15 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
-declare const Bun: any;
+declare const Bun: {
+  env: Record<string, string | undefined>;
+  file: (path: string) => { exists: () => Promise<boolean> };
+  serve: (options: { port: number; hostname: string; fetch: unknown }) => {
+    hostname: string;
+    port: number;
+    stop: (closeActiveConnections?: boolean) => void;
+  };
+};
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
