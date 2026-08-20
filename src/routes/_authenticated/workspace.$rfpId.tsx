@@ -35,17 +35,40 @@ function Workspace() {
   const sections = rfp.data?.sections ?? [];
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = sections.find((s) => s.id === activeId) ?? sections[0];
-  useEffect(() => { if (!activeId && sections[0]) setActiveId(sections[0].id); }, [sections, activeId]);
+
+  useEffect(() => {
+    if (!activeId && sections[0]?.id) {
+      setActiveId(sections[0].id);
+    }
+  }, [sections, activeId]);
 
   const [content, setContent] = useState("");
-  useEffect(() => { if (active) setContent(active.human_edits || active.ai_draft || ""); }, [active?.id]);
+  useEffect(() => {
+    if (active) {
+      setContent(active.human_edits || active.ai_draft || "");
+    }
+  }, [active?.id]);
 
   const [tab, setTab] = useState<"compliance" | "comments" | "versions">("compliance");
-  const comments = useQuery({ queryKey: ["comments", active?.id], queryFn: () => commentsFn({ data: { sectionId: active!.id } }), enabled: !!active });
-  const versions = useQuery({ queryKey: ["versions", active?.id], queryFn: () => versionsFn({ data: { sectionId: active!.id } }), enabled: !!active });
+  const activeSectionId = active?.id;
+
+  const comments = useQuery({
+    queryKey: ["comments", activeSectionId],
+    queryFn: () => (activeSectionId ? commentsFn({ data: { sectionId: activeSectionId } }) : Promise.resolve([])),
+    enabled: !!activeSectionId,
+  });
+
+  const versions = useQuery({
+    queryKey: ["versions", activeSectionId],
+    queryFn: () => (activeSectionId ? versionsFn({ data: { sectionId: activeSectionId } }) : Promise.resolve([])),
+    enabled: !!activeSectionId,
+  });
 
   const draft = useMutation({
-    mutationFn: () => draftFn({ data: { sectionId: active!.id } }),
+    mutationFn: () => {
+      if (!activeSectionId) throw new Error("No section selected");
+      return draftFn({ data: { sectionId: activeSectionId } });
+    },
     onSuccess: (r) => { setContent(r.draft); qc.invalidateQueries({ queryKey: ["rfp", rfpId] }); toast.success("AI draft ready"); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Draft failed"),
   });
@@ -58,21 +81,32 @@ function Workspace() {
     onSuccess: (r) => { setContent((c) => c + " " + r.text); },
   });
   const save = useMutation({
-    mutationFn: () => saveFn({ data: { sectionId: active!.id, content } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rfp", rfpId] }); qc.invalidateQueries({ queryKey: ["versions", active?.id] }); toast.success("Saved"); },
+    mutationFn: () => {
+      if (!activeSectionId) throw new Error("No section selected");
+      return saveFn({ data: { sectionId: activeSectionId, content } });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["rfp", rfpId] }); qc.invalidateQueries({ queryKey: ["versions", activeSectionId] }); toast.success("Saved"); },
   });
   const score = useMutation({
-    mutationFn: () => scoreFn({ data: { sectionId: active!.id } }),
+    mutationFn: () => {
+      if (!activeSectionId) throw new Error("No section selected");
+      return scoreFn({ data: { sectionId: activeSectionId } });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rfp", rfpId] }),
   });
   const [comment, setComment] = useState("");
   const sendComment = useMutation({
-    mutationFn: () => addCommentFn({ data: { sectionId: active!.id, text: comment } }),
-    onSuccess: () => { setComment(""); qc.invalidateQueries({ queryKey: ["comments", active?.id] }); },
+    mutationFn: () => {
+      if (!activeSectionId) throw new Error("No section selected");
+      return addCommentFn({ data: { sectionId: activeSectionId, text: comment } });
+    },
+    onSuccess: () => { setComment(""); qc.invalidateQueries({ queryKey: ["comments", activeSectionId] }); },
   });
   const setCompliance = useMutation({
-    mutationFn: (status: "approved" | "rejected" | "needs_review") =>
-      complianceFn({ data: { sectionId: active!.id, compliance_status: status } }),
+    mutationFn: (status: "approved" | "rejected" | "needs_review") => {
+      if (!activeSectionId) throw new Error("No section selected");
+      return complianceFn({ data: { sectionId: activeSectionId, compliance_status: status } });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rfp", rfpId] }),
   });
 
