@@ -61,7 +61,7 @@ export function ErrorCard({ error, reset }: { error: Error; reset?: () => void }
 }
 
 export function Avatar({ name }: { name: string }) {
-  const initial = (name || "?").trim().charAt(0).toUpperCase();
+  const initial = ((name || "").trim() || "?").charAt(0).toUpperCase();
   return (
     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600/30 text-[10px] font-semibold text-indigo-300">
       {initial}
