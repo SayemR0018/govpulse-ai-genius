@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listRfps, getRfp } from "@/lib/rfp.functions";
 import { extractRequirements } from "@/lib/ai.functions";
 import { useState } from "react";
-import { Upload, Sparkles, Loader2, FileText } from "lucide-react";
+import { Upload, Sparkles, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, ErrorCard, AiSpinner, Skeleton } from "@/components/ui-kit";
 
