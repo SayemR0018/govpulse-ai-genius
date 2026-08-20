@@ -44,20 +44,24 @@ function Analytics() {
 }
 
 function BarList({ data, tone }: { data: Array<{ name: string; value: number; label: string }>; tone: "ai" | "success" }) {
-  const max = Math.max(...data.map((item) => item.value), 1);
+  const values = data.map((item) => item.value);
+  const max = values.length > 0 ? Math.max(...values, 1) : 1;
   const fillClass = tone === "ai" ? "bg-ai" : "bg-success";
 
   return (
     <div className="mt-4 space-y-3 text-xs">
-      {data.map((item) => (
-        <div key={`${item.name}-${item.label}`} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3">
-          <span className="truncate text-muted-foreground">{item.name}</span>
-          <div className="h-3 overflow-hidden rounded-full bg-background">
-            <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${Math.max(3, (item.value / max) * 100)}%` }} />
+      {data.map((item) => {
+        const pct = max > 0 ? Math.max(3, (item.value / max) * 100) : 3;
+        return (
+          <div key={`${item.name}-${item.label}`} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3">
+            <span className="truncate text-muted-foreground">{item.name}</span>
+            <div className="h-3 overflow-hidden rounded-full bg-background">
+              <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-right font-medium text-foreground">{item.label}</span>
           </div>
-          <span className="text-right font-medium text-foreground">{item.label}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

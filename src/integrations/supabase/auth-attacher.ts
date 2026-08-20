@@ -6,10 +6,30 @@ import { supabase } from './client'
 // the browser never attaches the bearer token to serverFn RPCs.
 export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
   async ({ next }) => {
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    return next({
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.warn("[Auth Attacher] Session fetch error:", error.message);
+      }
+      let token = data.session?.access_token;
+
+      // If token exists but expires in < 30 seconds, attempt explicit refresh
+      if (data.session?.expires_at) {
+        const expiresAtMs = data.session.expires_at * 1000;
+        if (Date.now() > expiresAtMs - 30_000) {
+          const { data: refreshed } = await supabase.auth.refreshSession();
+          if (refreshed?.session?.access_token) {
+            token = refreshed.session.access_token;
+          }
+        }
+      }
+
+      return next({
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    } catch (err) {
+      console.error("[Auth Attacher] Middleware failed:", err);
+      return next({ headers: {} });
+    }
   },
 )
