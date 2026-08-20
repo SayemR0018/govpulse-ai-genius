@@ -34,12 +34,16 @@ function IngestPage() {
 
   const detail = useQuery({
     queryKey: ["rfp", selectedRfp],
-    queryFn: () => getRfpFn({ data: { rfpId: selectedRfp! } }),
+    queryFn: () => (selectedRfp ? getRfpFn({ data: { rfpId: selectedRfp } }) : Promise.reject("No RFP selected")),
     enabled: !!selectedRfp,
   });
 
   const extract = useMutation({
-    mutationFn: () => extractFn({ data: { rfpId: selectedRfp!, documentText: text } }),
+    mutationFn: () => {
+      if (!selectedRfp) throw new Error("Please select an RFP first");
+      if (text.trim().length < 20) throw new Error("RFP document text must be at least 20 characters");
+      return extractFn({ data: { rfpId: selectedRfp, documentText: text } });
+    },
     onSuccess: (res) => {
       const pages = Math.max(1, Math.ceil(text.length / 3000));
       toast.success(`Extracted ${res.count} requirements from ${pages} page${pages > 1 ? "s" : ""}`);

@@ -8,9 +8,9 @@ import type { Database } from './types'
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+    const processEnv = typeof process !== 'undefined' ? process.env : {};
+    const SUPABASE_URL = processEnv.SUPABASE_URL?.trim();
+    const SUPABASE_PUBLISHABLE_KEY = processEnv.SUPABASE_PUBLISHABLE_KEY?.trim();
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
@@ -44,8 +44,8 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     }
 
     const supabase = createClient<Database>(
-      SUPABASE_URL!,
-      SUPABASE_PUBLISHABLE_KEY!,
+      SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY,
       {
         global: {
           headers: {
@@ -60,21 +60,33 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
-      throw new Error('Unauthorized: Invalid token');
-    }
+    try {
+      const { data, error } = await supabase.auth.getClaims(token);
+      if (error || !data?.claims) {
+        const errMsg = error?.message?.toLowerCase() ?? '';
+        if (errMsg.includes('expired') || errMsg.includes('jwt expired')) {
+          throw new Error('Unauthorized: Session has expired. Please sign in again.');
+        }
+        throw new Error('Unauthorized: Invalid or unverified token');
+      }
 
-    if (!data.claims.sub) {
-      throw new Error('Unauthorized: No user ID found in token');
-    }
+      if (!data.claims.sub) {
+        throw new Error('Unauthorized: No user ID found in token');
+      }
 
-    return next({
-      context: {
-        supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
-      },
-    });
+      return next({
+        context: {
+          supabase,
+          userId: data.claims.sub,
+          claims: data.claims,
+        },
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Unauthorized:')) {
+        throw err;
+      }
+      console.error('[Supabase Auth Middleware] Unexpected verification failure:', err);
+      throw new Error('Unauthorized: Authentication failure');
+    }
   },
 );
