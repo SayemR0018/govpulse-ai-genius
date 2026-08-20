@@ -34,19 +34,23 @@ function IngestPage() {
 
   const detail = useQuery({
     queryKey: ["rfp", selectedRfp],
-    queryFn: () => (selectedRfp ? getRfpFn({ data: { rfpId: selectedRfp } }) : Promise.reject("No RFP selected")),
+    queryFn: () =>
+      selectedRfp ? getRfpFn({ data: { rfpId: selectedRfp } }) : Promise.reject("No RFP selected"),
     enabled: !!selectedRfp,
   });
 
   const extract = useMutation({
     mutationFn: () => {
       if (!selectedRfp) throw new Error("Please select an RFP first");
-      if (text.trim().length < 20) throw new Error("RFP document text must be at least 20 characters");
+      if (text.trim().length < 20)
+        throw new Error("RFP document text must be at least 20 characters");
       return extractFn({ data: { rfpId: selectedRfp, documentText: text } });
     },
     onSuccess: (res) => {
       const pages = Math.max(1, Math.ceil(text.length / 3000));
-      toast.success(`Extracted ${res.count} requirements from ${pages} page${pages > 1 ? "s" : ""}`);
+      toast.success(
+        `Extracted ${res.count} requirements from ${pages} page${pages > 1 ? "s" : ""}`,
+      );
       qc.invalidateQueries({ queryKey: ["rfp", selectedRfp] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Extraction failed"),
@@ -58,29 +62,38 @@ function IngestPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">RFP Ingestion Hub</h1>
-        <p className="text-sm text-muted-foreground">Upload an RFP, then let AI extract compliance requirements.</p>
+        <p className="text-sm text-muted-foreground">
+          Upload an RFP, then let AI extract compliance requirements.
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {(rfps.data ?? []).map((r) => (
           <button
-            key={r.id} onClick={() => setSelectedRfp(r.id)}
+            key={r.id}
+            onClick={() => setSelectedRfp(r.id)}
             className={`rounded-md border px-3 py-1.5 text-xs ${selectedRfp === r.id ? "border-ai bg-ai-soft" : "border-border hover:bg-accent"}`}
           >
             {r.title}
           </button>
         ))}
         {rfps.data?.length === 0 && (
-          <Link to="/dashboard" className="text-xs text-muted-foreground underline">Create an RFP first →</Link>
+          <Link to="/dashboard" className="text-xs text-muted-foreground underline">
+            Create an RFP first →
+          </Link>
         )}
       </div>
 
       {selectedRfp && (
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-border bg-card p-4">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-medium"><Upload className="h-4 w-4" /> Document</h2>
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-medium">
+              <Upload className="h-4 w-4" /> Document
+            </h2>
             <textarea
-              value={text} onChange={(e) => setText(e.target.value)} rows={18}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={18}
               className="w-full rounded-md border border-input bg-background p-3 font-mono text-xs"
               placeholder="Paste RFP text here (or upload — wire your PDF parser to populate this)…"
             />
@@ -98,23 +111,39 @@ function IngestPage() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-medium">Extracted Requirements</h2>
               <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{pageCount} pages</span>
+                <span className="inline-flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  {pageCount} pages
+                </span>
                 <span>{wordCount.toLocaleString()} words</span>
               </div>
             </div>
             <div className="space-y-2">
               {detail.isLoading && <Skeleton className="h-24 w-full" />}
               {!detail.isLoading && (detail.data?.requirements ?? []).length === 0 && (
-                <EmptyState icon={Upload} title="No requirements yet" hint="Paste text and run Extract with AI" />
+                <EmptyState
+                  icon={Upload}
+                  title="No requirements yet"
+                  hint="Paste text and run Extract with AI"
+                />
               )}
               {(detail.data?.requirements ?? []).map((r) => (
-                <div key={r.id} className="rounded-md border border-border bg-background/40 p-2 text-xs">
+                <div
+                  key={r.id}
+                  className="rounded-md border border-border bg-background/40 p-2 text-xs"
+                >
                   <div className="flex items-center justify-between">
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                      r.risk_level === "high" ? "bg-risk-high/20 text-risk-high"
-                      : r.risk_level === "med" ? "bg-risk-med/20 text-risk-med"
-                      : "bg-risk-low/20 text-risk-low"
-                    }`}>{r.risk_level}</span>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                        r.risk_level === "high"
+                          ? "bg-risk-high/20 text-risk-high"
+                          : r.risk_level === "med"
+                            ? "bg-risk-med/20 text-risk-med"
+                            : "bg-risk-low/20 text-risk-low"
+                      }`}
+                    >
+                      {r.risk_level}
+                    </span>
                     <span className="text-[10px] text-muted-foreground">{r.status}</span>
                   </div>
                   <div className="mt-1 text-foreground">{r.text_snippet}</div>
@@ -122,7 +151,11 @@ function IngestPage() {
               ))}
             </div>
             {selectedRfp && detail.data && (
-              <Link to="/workspace/$rfpId" params={{ rfpId: selectedRfp }} className="mt-3 inline-block text-xs text-ai underline">
+              <Link
+                to="/workspace/$rfpId"
+                params={{ rfpId: selectedRfp }}
+                className="mt-3 inline-block text-xs text-ai underline"
+              >
                 Open drafting workspace →
               </Link>
             )}
@@ -132,4 +165,3 @@ function IngestPage() {
     </div>
   );
 }
-
