@@ -1,9 +1,28 @@
 import "./lib/error-capture";
+import path from "node:path";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
-declare const Bun: any;
+interface BunFile {
+  exists(): Promise<boolean>;
+}
+
+interface BunGlobal {
+  env?: Record<string, string>;
+  file(path: string): BunFile;
+  serve(options: {
+    port: number;
+    hostname: string;
+    fetch: (request: Request, env?: unknown, ctx?: unknown) => Promise<Response>;
+  }): {
+    hostname: string;
+    port: number;
+    stop(closeActiveConnections?: boolean): void;
+  };
+}
+
+declare const Bun: BunGlobal | undefined;
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -39,21 +58,58 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
-const PORT = Number(process.env.PORT || (typeof Bun !== "undefined" && Bun.env.PORT) || 3000);
+const PORT = Number(process.env.PORT || (typeof Bun !== "undefined" && Bun?.env?.PORT) || 3000);
 const HOST = "0.0.0.0";
+const CLIENT_DIR = path.resolve(process.cwd(), "dist/client");
+
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 const serverExport = {
   port: PORT,
   hostname: HOST,
-  async fetch(request: Request, env?: unknown, ctx?: unknown) {
+  async fetch(request: Request, env?: unknown, ctx?: unknown): Promise<Response> {
     const url = new URL(request.url);
 
     // Serve static client assets in production if using Bun runtime
-    if (typeof Bun !== "undefined") {
-      const staticFilePath = `./dist/client${url.pathname}`;
-      const staticFile = Bun.file(staticFilePath);
+    if (typeof Bun !== "undefined" && Bun?.file) {
+      let decodedPathname: string;
+      try {
+        decodedPathname = decodeURIComponent(url.pathname);
+      } catch {
+        return withSecurityHeaders(
+          new Response("Bad Request", {
+            status: 400,
+            headers: { "content-type": "text/plain; charset=utf-8" },
+          }),
+        );
+      }
+
+      const safePath = path.resolve(CLIENT_DIR, "." + decodedPathname);
+      const isWithinClientDir =
+        safePath === CLIENT_DIR || safePath.startsWith(CLIENT_DIR + path.sep);
+
+      if (!isWithinClientDir) {
+        return withSecurityHeaders(
+          new Response("Forbidden", {
+            status: 403,
+            headers: { "content-type": "text/plain; charset=utf-8" },
+          }),
+        );
+      }
+
+      const staticFile = Bun.file(safePath);
       if (await staticFile.exists()) {
-        return new Response(staticFile);
+        return withSecurityHeaders(new Response(staticFile as unknown as BodyInit));
       }
     }
 
@@ -62,22 +118,27 @@ const serverExport = {
       const response = await handler.fetch(request, env, ctx);
 
       // If TanStack Start SSR return 404 for a route, check if client static assets/index.html fallback exists
-      if (response.status === 404 && typeof Bun !== "undefined") {
-        const clientIndex = Bun.file("./dist/client/index.html");
+      if (response.status === 404 && typeof Bun !== "undefined" && Bun?.file) {
+        const clientIndex = Bun.file(path.join(CLIENT_DIR, "index.html"));
         if (await clientIndex.exists()) {
-          return new Response(clientIndex, {
-            headers: { "content-type": "text/html; charset=utf-8" },
-          });
+          return withSecurityHeaders(
+            new Response(clientIndex as unknown as BodyInit, {
+              headers: { "content-type": "text/html; charset=utf-8" },
+            }),
+          );
         }
       }
 
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(normalized);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };
