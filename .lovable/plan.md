@@ -1,4 +1,3 @@
-
 # GovPulse AI — Build Plan
 
 Enterprise grant/RFP response platform. Build the full surface end-to-end, with AI wired through Lovable AI Gateway and real auth via Lovable Cloud.
@@ -57,6 +56,7 @@ Shared UI: shadcn (already in project) + RiskBadge, StatusPill, ComplianceRing, 
 ## 4. Database schema (migration)
 
 Enums:
+
 ```sql
 create type app_role as enum ('proposal_manager', 'sme', 'compliance_auditor');
 create type rfp_status as enum ('ingestion','parsing','drafting','review','submitted');
@@ -65,6 +65,7 @@ create type req_status as enum ('pending','met','warning');
 ```
 
 Tables (all with GRANTs + RLS):
+
 1. `organizations(id, name, plan_tier, created_at)`
 2. `org_members(org_id, user_id, joined_at)` — membership join
 3. `user_roles(id, user_id, org_id, role app_role, unique(user_id,org_id,role))` — separate from profiles
@@ -79,6 +80,7 @@ Tables (all with GRANTs + RLS):
 Security definer functions: `has_role(uid, org, role)`, `is_org_member(uid, org)`.
 
 RLS pattern: every table scopes to `is_org_member(auth.uid(), org_id)`; writes additionally gated by role per spec:
+
 - Proposal Manager: full RW on rfp_projects, requirements, sections (incl. assignments).
 - SME: SELECT all; UPDATE sections only WHERE `assigned_to = auth.uid()`; INSERT comments.
 - Compliance Auditor: UPDATE `compliance_status` on sections + `status` on requirements.
@@ -89,17 +91,17 @@ Profile auto-create trigger on `auth.users` insert.
 
 All in `src/lib/*.functions.ts`, secrets read inside `.handler()`. AI helper lives in `src/lib/ai-gateway.server.ts`.
 
-| Function | Purpose |
-|---|---|
-| `extractRequirements({ rfpId, documentText })` | AI: parse PDF text → structured requirements list with risk levels (Output schema via Zod) |
-| `generateSectionDraft({ sectionId, prompt, context })` | AI: produce initial section draft |
-| `improveTone({ sectionId, text, tone })` | AI: rewrite selection |
-| `autocomplete({ sectionId, precedingText })` | AI: short continuation |
-| `regenerateSection({ sectionId })` | AI: re-draft from requirements |
-| `scoreCompliance({ sectionId })` | AI: returns score 0–100 + flagged gaps |
-| `estimateWinProbability({ rfpId })` | AI: aggregate score |
-| `assignRequirement / updateSectionStatus / addComment / createRfp / updateRfpStatus` | Standard CRUD with `requireSupabaseAuth` |
-| `switchActiveRole({ role })` | Demo-only: writes selected role to `profiles.current_role_preview` |
+| Function                                                                             | Purpose                                                                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `extractRequirements({ rfpId, documentText })`                                       | AI: parse PDF text → structured requirements list with risk levels (Output schema via Zod) |
+| `generateSectionDraft({ sectionId, prompt, context })`                               | AI: produce initial section draft                                                          |
+| `improveTone({ sectionId, text, tone })`                                             | AI: rewrite selection                                                                      |
+| `autocomplete({ sectionId, precedingText })`                                         | AI: short continuation                                                                     |
+| `regenerateSection({ sectionId })`                                                   | AI: re-draft from requirements                                                             |
+| `scoreCompliance({ sectionId })`                                                     | AI: returns score 0–100 + flagged gaps                                                     |
+| `estimateWinProbability({ rfpId })`                                                  | AI: aggregate score                                                                        |
+| `assignRequirement / updateSectionStatus / addComment / createRfp / updateRfpStatus` | Standard CRUD with `requireSupabaseAuth`                                                   |
+| `switchActiveRole({ role })`                                                         | Demo-only: writes selected role to `profiles.current_role_preview`                         |
 
 PDF upload → text extraction handled client-side with `pdfjs-dist` (Worker-safe via web worker) to avoid Node-only deps on the server; extracted text posted to `extractRequirements`.
 

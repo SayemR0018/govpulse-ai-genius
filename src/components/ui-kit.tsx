@@ -51,7 +51,10 @@ export function ErrorCard({ error, reset }: { error: Error; reset?: () => void }
       <h2 className="mt-2 text-base font-semibold text-white">Something went wrong</h2>
       <p className="mt-1 text-xs text-slate-400">{error.message || "Unexpected error"}</p>
       <button
-        onClick={() => { reset?.(); router.invalidate(); }}
+        onClick={() => {
+          reset?.();
+          router.invalidate();
+        }}
         className="mt-4 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
       >
         <RefreshCw className="h-4 w-4" /> Retry

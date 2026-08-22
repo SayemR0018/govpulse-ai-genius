@@ -1,9 +1,37 @@
+import path from "node:path";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
-declare const Bun: any;
+declare const Bun: {
+  env?: Record<string, string | undefined>;
+  file: (path: string) => BodyInit & { exists: () => Promise<boolean> };
+  serve: (options: {
+    port: number;
+    hostname: string;
+    fetch: (req: Request, env?: unknown, ctx?: unknown) => Promise<Response> | Response;
+  }) => {
+    hostname: string;
+    port: number;
+    stop: (closeActiveConnections?: boolean) => void;
+  };
+};
+
+/**
+ * Resolves a request pathname safely within a base directory, preventing path traversal.
+ * Returns the absolute path if safe, or null if the path attempts to break out of baseDir.
+ */
+export function getSafeStaticFilePath(pathname: string, baseDir = "./dist/client"): string | null {
+  const resolvedBase = path.resolve(baseDir);
+  const safePath = pathname.replace(/^[/]+/, "");
+  const resolvedTarget = path.resolve(resolvedBase, safePath);
+
+  if (resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path.sep)) {
+    return resolvedTarget;
+  }
+  return null;
+}
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -39,7 +67,7 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
-const PORT = Number(process.env.PORT || (typeof Bun !== "undefined" && Bun.env.PORT) || 3000);
+const PORT = Number(process.env.PORT || (typeof Bun !== "undefined" && Bun.env?.PORT) || 3000);
 const HOST = "0.0.0.0";
 
 const serverExport = {
@@ -48,12 +76,14 @@ const serverExport = {
   async fetch(request: Request, env?: unknown, ctx?: unknown) {
     const url = new URL(request.url);
 
-    // Serve static client assets in production if using Bun runtime
+    // Serve static client assets in production if using Bun runtime (with path traversal check)
     if (typeof Bun !== "undefined") {
-      const staticFilePath = `./dist/client${url.pathname}`;
-      const staticFile = Bun.file(staticFilePath);
-      if (await staticFile.exists()) {
-        return new Response(staticFile);
+      const staticFilePath = getSafeStaticFilePath(url.pathname);
+      if (staticFilePath) {
+        const staticFile = Bun.file(staticFilePath);
+        if (await staticFile.exists()) {
+          return new Response(staticFile);
+        }
       }
     }
 
