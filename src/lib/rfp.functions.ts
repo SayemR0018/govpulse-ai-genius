@@ -274,21 +274,25 @@ export const createLibraryItem = createServerFn({ method: "POST" })
 export const getDashboardKpis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: rfps } = await context.supabase
-      .from("rfp_projects")
-      .select("budget, win_probability, due_date, status");
-    const { data: reqs } = await context.supabase
-      .from("rfp_requirements")
-      .select("risk_level, status")
-      .neq("status", "met");
-    const list = rfps ?? [];
-    const active = list.filter((r) => r.status !== "submitted");
+    const [{ data: activeRfps }, { count: flagsCount }] = await Promise.all([
+      context.supabase
+        .from("rfp_projects")
+        .select("budget, win_probability, due_date")
+        .neq("status", "submitted"),
+      context.supabase
+        .from("rfp_requirements")
+        .select("*", { count: "exact", head: true })
+        .neq("status", "met")
+        .eq("risk_level", "high"),
+    ]);
+
+    const active = activeRfps ?? [];
     const totalValue = active.reduce((s, r) => s + Number(r.budget ?? 0), 0);
     const avgWin =
       active.length === 0
         ? 0
         : Math.round(active.reduce((s, r) => s + Number(r.win_probability ?? 0), 0) / active.length);
-    const flags = (reqs ?? []).filter((r) => r.risk_level === "high").length;
+    const flags = flagsCount ?? 0;
     const today = new Date();
     const upcoming = active
       .map((r) => (r.due_date ? Math.ceil((new Date(r.due_date).getTime() - today.getTime()) / 86400000) : null))
