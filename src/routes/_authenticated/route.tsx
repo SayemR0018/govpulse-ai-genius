@@ -41,8 +41,8 @@ function AppShell() {
     navigate({ to: "/auth", replace: true });
   }
 
-  async function switchRole(r: string) {
-    setRole(r as RolePreview);
+  async function switchRole(r: RolePreview) {
+    setRole(r);
     await supabase.from("profiles").update({ current_role_preview: r as never }).eq("id", (await supabase.auth.getUser()).data.user!.id);
     toast.success(`Viewing as ${r.replace("_", " ")}`);
   }
@@ -81,7 +81,7 @@ function AppShell() {
           <div className="flex items-center gap-3">
             <select
               value={role}
-              onChange={(e) => switchRole(e.target.value)}
+              onChange={(e) => switchRole(e.target.value as RolePreview)}
               className="rounded-md border border-border bg-card px-2 py-1 text-xs"
               title="Demo role switcher"
             >
