@@ -1,5 +1,6 @@
 import "./lib/error-capture";
 
+import path from "node:path";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
@@ -48,12 +49,15 @@ const serverExport = {
   async fetch(request: Request, env?: unknown, ctx?: unknown) {
     const url = new URL(request.url);
 
-    // Serve static client assets in production if using Bun runtime
+    // Serve static client assets in production if using Bun runtime safely against path traversal
     if (typeof Bun !== "undefined") {
-      const staticFilePath = `./dist/client${url.pathname}`;
-      const staticFile = Bun.file(staticFilePath);
-      if (await staticFile.exists()) {
-        return new Response(staticFile);
+      const clientDir = path.resolve("./dist/client");
+      const safeFilePath = path.resolve(clientDir, "." + url.pathname);
+      if (safeFilePath === clientDir || safeFilePath.startsWith(clientDir + path.sep)) {
+        const staticFile = Bun.file(safeFilePath);
+        if (await staticFile.exists()) {
+          return new Response(staticFile);
+        }
       }
     }
 

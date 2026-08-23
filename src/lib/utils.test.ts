@@ -4,9 +4,7 @@ import { cn } from "./utils";
 describe("cn utility function", () => {
   test("merges single and multiple class names", () => {
     expect(cn("px-2", "py-1")).toBe("px-2 py-1");
-    expect(cn("text-red-500", "font-bold", "bg-white")).toBe(
-      "text-red-500 font-bold bg-white"
-    );
+    expect(cn("text-red-500", "font-bold", "bg-white")).toBe("text-red-500 font-bold bg-white");
   });
 
   test("handles conditional and falsy values correctly", () => {
@@ -16,7 +14,7 @@ describe("cn utility function", () => {
 
   test("handles array and object syntax from clsx", () => {
     expect(cn(["px-2", "py-1"], { "text-red-500": true, "bg-blue-500": false })).toBe(
-      "px-2 py-1 text-red-500"
+      "px-2 py-1 text-red-500",
     );
   });
 

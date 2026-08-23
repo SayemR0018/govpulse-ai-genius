@@ -3,7 +3,13 @@ import { describe, expect, it } from "bun:test";
 
 // Mock Supabase client to test both old and new logic
 function createMockSupabase(dataset: {
-  rfps: Array<{ id: string; budget: number | null; win_probability: number | null; due_date: string | null; status: string }>;
+  rfps: Array<{
+    id: string;
+    budget: number | null;
+    win_probability: number | null;
+    due_date: string | null;
+    status: string;
+  }>;
   reqs: Array<{ id: string; risk_level: string; status: string }>;
 }) {
   return {
@@ -75,11 +81,16 @@ async function getDashboardKpisOriginal(supabase: any) {
   const avgWin =
     active.length === 0
       ? 0
-      : Math.round(active.reduce((s: number, r: any) => s + Number(r.win_probability ?? 0), 0) / active.length);
+      : Math.round(
+          active.reduce((s: number, r: any) => s + Number(r.win_probability ?? 0), 0) /
+            active.length,
+        );
   const flags = (reqs ?? []).filter((r: any) => r.risk_level === "high").length;
   const today = new Date();
   const upcoming = active
-    .map((r: any) => (r.due_date ? Math.ceil((new Date(r.due_date).getTime() - today.getTime()) / 86400000) : null))
+    .map((r: any) =>
+      r.due_date ? Math.ceil((new Date(r.due_date).getTime() - today.getTime()) / 86400000) : null,
+    )
     .filter((n: any): n is number => n !== null && n >= 0)
     .sort((a: number, b: number) => a - b)[0];
   return { totalValue, avgWin, flags, daysToNearest: upcoming ?? null };
@@ -103,11 +114,16 @@ async function getDashboardKpisOptimized(supabase: any) {
   const avgWin =
     active.length === 0
       ? 0
-      : Math.round(active.reduce((s: number, r: any) => s + Number(r.win_probability ?? 0), 0) / active.length);
+      : Math.round(
+          active.reduce((s: number, r: any) => s + Number(r.win_probability ?? 0), 0) /
+            active.length,
+        );
   const flags = flagsCount ?? 0;
   const today = new Date();
   const upcoming = active
-    .map((r: any) => (r.due_date ? Math.ceil((new Date(r.due_date).getTime() - today.getTime()) / 86400000) : null))
+    .map((r: any) =>
+      r.due_date ? Math.ceil((new Date(r.due_date).getTime() - today.getTime()) / 86400000) : null,
+    )
     .filter((n: any): n is number => n !== null && n >= 0)
     .sort((a: number, b: number) => a - b)[0];
   return { totalValue, avgWin, flags, daysToNearest: upcoming ?? null };
@@ -118,8 +134,8 @@ describe("getDashboardKpis", () => {
     rfps: Array.from({ length: 5000 }).map((_, i) => ({
       id: `rfp-${i}`,
       budget: (i % 10) * 10000,
-      win_probability: (i % 100),
-      due_date: new Date(Date.now() + (i % 30 + 1) * 86400000).toISOString(),
+      win_probability: i % 100,
+      due_date: new Date(Date.now() + ((i % 30) + 1) * 86400000).toISOString(),
       status: i % 5 === 0 ? "submitted" : "drafting",
     })),
     reqs: Array.from({ length: 20000 }).map((_, i) => ({
