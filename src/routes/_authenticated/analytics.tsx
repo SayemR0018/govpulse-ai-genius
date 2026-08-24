@@ -15,7 +15,9 @@ function Analytics() {
   const fn = useServerFn(listRfps);
   const q = useQuery({ queryKey: ["rfps"], queryFn: () => fn() });
   const data = (q.data ?? []).map((r) => ({
-    name: r.title.slice(0, 14), win: r.win_probability ?? 0, budget: Number(r.budget ?? 0) / 1000,
+    name: r.title.slice(0, 14),
+    win: r.win_probability ?? 0,
+    budget: Number(r.budget ?? 0) / 1000,
   }));
   return (
     <div className="space-y-6">
@@ -24,26 +26,59 @@ function Analytics() {
         <p className="text-sm text-muted-foreground">Pipeline value and win probability by RFP.</p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        {q.isLoading && (<><Skeleton className="h-72" /><Skeleton className="h-72" /></>)}
-        {!q.isLoading && data.length === 0 && (
-          <div className="lg:col-span-2"><EmptyState icon={BarChart3} title="No data yet" hint="Create an RFP to populate analytics" /></div>
+        {q.isLoading && (
+          <>
+            <Skeleton className="h-72" />
+            <Skeleton className="h-72" />
+          </>
         )}
-        {!q.isLoading && data.length > 0 && (<>
-        <div className="h-72 rounded-2xl border border-border bg-card p-4">
-          <h3 className="mb-2 text-sm font-medium">Win probability</h3>
-          <BarList data={data.map((item) => ({ name: item.name, value: item.win, label: `${item.win}%` }))} tone="ai" />
-        </div>
-        <div className="h-72 rounded-2xl border border-border bg-card p-4">
-          <h3 className="mb-2 text-sm font-medium">Budget ($K)</h3>
-          <BarList data={data.map((item) => ({ name: item.name, value: item.budget, label: `$${Math.round(item.budget)}K` }))} tone="success" />
-        </div>
-        </>)}
+        {!q.isLoading && data.length === 0 && (
+          <div className="lg:col-span-2">
+            <EmptyState
+              icon={BarChart3}
+              title="No data yet"
+              hint="Create an RFP to populate analytics"
+            />
+          </div>
+        )}
+        {!q.isLoading && data.length > 0 && (
+          <>
+            <div className="h-72 rounded-2xl border border-border bg-card p-4">
+              <h3 className="mb-2 text-sm font-medium">Win probability</h3>
+              <BarList
+                data={data.map((item) => ({
+                  name: item.name,
+                  value: item.win,
+                  label: `${item.win}%`,
+                }))}
+                tone="ai"
+              />
+            </div>
+            <div className="h-72 rounded-2xl border border-border bg-card p-4">
+              <h3 className="mb-2 text-sm font-medium">Budget ($K)</h3>
+              <BarList
+                data={data.map((item) => ({
+                  name: item.name,
+                  value: item.budget,
+                  label: `$${Math.round(item.budget)}K`,
+                }))}
+                tone="success"
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function BarList({ data, tone }: { data: Array<{ name: string; value: number; label: string }>; tone: "ai" | "success" }) {
+function BarList({
+  data,
+  tone,
+}: {
+  data: Array<{ name: string; value: number; label: string }>;
+  tone: "ai" | "success";
+}) {
   const values = data.map((item) => item.value);
   const max = values.length > 0 ? Math.max(...values, 1) : 1;
   const fillClass = tone === "ai" ? "bg-ai" : "bg-success";
@@ -53,7 +88,10 @@ function BarList({ data, tone }: { data: Array<{ name: string; value: number; la
       {data.map((item) => {
         const pct = max > 0 ? Math.max(3, (item.value / max) * 100) : 3;
         return (
-          <div key={`${item.name}-${item.label}`} className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3">
+          <div
+            key={`${item.name}-${item.label}`}
+            className="grid grid-cols-[5.5rem_1fr_3.5rem] items-center gap-3"
+          >
             <span className="truncate text-muted-foreground">{item.name}</span>
             <div className="h-3 overflow-hidden rounded-full bg-background">
               <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${pct}%` }} />
@@ -65,4 +103,3 @@ function BarList({ data, tone }: { data: Array<{ name: string; value: number; la
     </div>
   );
 }
-
