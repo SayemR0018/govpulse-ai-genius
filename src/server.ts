@@ -5,7 +5,7 @@ import { renderErrorPage } from "./lib/error-page";
 
 declare const Bun: {
   env: Record<string, string | undefined>;
-  file: (path: string) => { exists: () => Promise<boolean> };
+  file: (path: string) => any;
   serve: (options: {
     port: number;
     hostname: string;
@@ -110,4 +110,4 @@ if (import.meta.main && typeof Bun !== "undefined") {
   process.on("SIGTERM", shutdown);
 }
 
-export default serverExport;
+export default import.meta.main ? {} : serverExport;
