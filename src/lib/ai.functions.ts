@@ -11,13 +11,16 @@ const requirementSchema = z.object({
 export const extractRequirements = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ rfpId: z.string().uuid(), documentText: z.string().min(20).max(100000) }).parse(input),
+    z
+      .object({ rfpId: z.string().uuid(), documentText: z.string().min(20).max(100000) })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
     try {
-      const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+      const { createLovableAiGatewayProvider, DEFAULT_MODEL } =
+        await import("@/lib/ai-gateway.server");
       const gateway = createLovableAiGatewayProvider(key);
       const sanitizedDoc = data.documentText.slice(0, 15000).trim();
       const { object } = await generateObject({
@@ -45,7 +48,9 @@ export const extractRequirements = createServerFn({ method: "POST" })
 export const generateSectionDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ sectionId: z.string().uuid(), instructions: z.string().max(2000).optional() }).parse(i),
+    z
+      .object({ sectionId: z.string().uuid(), instructions: z.string().max(2000).optional() })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     const key = process.env.LOVABLE_API_KEY;
@@ -64,14 +69,19 @@ export const generateSectionDraft = createServerFn({ method: "POST" })
         .eq("rfp_id", section.rfp_id)
         .limit(20);
       const reqList = (reqs ?? []).map((r) => `- [${r.risk_level}] ${r.text_snippet}`).join("\n");
-      const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+      const { createLovableAiGatewayProvider, DEFAULT_MODEL } =
+        await import("@/lib/ai-gateway.server");
       const gateway = createLovableAiGatewayProvider(key);
       const { text: draft } = await generateText({
         model: gateway(DEFAULT_MODEL),
-        system: "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
+        system:
+          "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
         prompt: `Write a concise, persuasive draft for the proposal section titled "${section.section_name}". Address these requirements:\n${reqList}\n\n${data.instructions ?? ""}`,
       });
-      await context.supabase.from("proposal_sections").update({ ai_draft: draft }).eq("id", data.sectionId);
+      await context.supabase
+        .from("proposal_sections")
+        .update({ ai_draft: draft })
+        .eq("id", data.sectionId);
       return { draft };
     } catch (err) {
       console.error("[AI Functions] generateSectionDraft failed:", err);
@@ -82,13 +92,19 @@ export const generateSectionDraft = createServerFn({ method: "POST" })
 export const improveTone = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ text: z.string().min(1).max(20000), tone: z.string().max(100).default("authoritative and concise") }).parse(i),
+    z
+      .object({
+        text: z.string().min(1).max(20000),
+        tone: z.string().max(100).default("authoritative and concise"),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
     try {
-      const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+      const { createLovableAiGatewayProvider, DEFAULT_MODEL } =
+        await import("@/lib/ai-gateway.server");
       const gateway = createLovableAiGatewayProvider(key);
       const { text: out } = await generateText({
         model: gateway(DEFAULT_MODEL),
@@ -111,7 +127,8 @@ export const autocomplete = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
     try {
-      const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+      const { createLovableAiGatewayProvider, DEFAULT_MODEL } =
+        await import("@/lib/ai-gateway.server");
       const gateway = createLovableAiGatewayProvider(key);
       const { text: out } = await generateText({
         model: gateway(DEFAULT_MODEL),
@@ -143,7 +160,8 @@ export const scoreCompliance = createServerFn({ method: "POST" })
         .eq("rfp_id", section.rfp_id);
       const key = process.env.LOVABLE_API_KEY;
       if (!key) throw new Error("LOVABLE_API_KEY missing");
-      const { createLovableAiGatewayProvider, DEFAULT_MODEL } = await import("@/lib/ai-gateway.server");
+      const { createLovableAiGatewayProvider, DEFAULT_MODEL } =
+        await import("@/lib/ai-gateway.server");
       const gateway = createLovableAiGatewayProvider(key);
       const draftContent = (section.human_edits || section.ai_draft || "(empty)").slice(0, 15000);
       const { object } = await generateObject({

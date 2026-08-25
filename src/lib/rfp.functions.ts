@@ -22,7 +22,9 @@ export const getMyProfile = createServerFn({ method: "GET" })
 
 export const setRolePreview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ role: z.enum(["proposal_manager", "sme", "compliance_auditor"]) }).parse(i))
+  .inputValidator((i: unknown) =>
+    z.object({ role: z.enum(["proposal_manager", "sme", "compliance_auditor"]) }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("profiles")
@@ -47,13 +49,28 @@ export const getRfp = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ rfpId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const [rfp, reqs, sections, members] = await Promise.all([
-      context.supabase.from("rfp_projects").select("*").eq("id", data.rfpId).single(),
-      context.supabase.from("rfp_requirements").select("*").eq("rfp_id", data.rfpId).order("created_at"),
-      context.supabase.from("proposal_sections").select("*").eq("rfp_id", data.rfpId).order("order_index"),
-      context.supabase.from("org_members").select("user_id"),
+    // Validate RFP access first to enforce authorization boundary and acquire org_id
+    const rfp = await context.supabase
+      .from("rfp_projects")
+      .select("*")
+      .eq("id", data.rfpId)
+      .single();
+    if (rfp.error || !rfp.data) throw new Error(rfp.error?.message ?? "RFP not found");
+
+    // Scope org_members specifically to the RFP's organization to prevent cross-org member leakage
+    const [reqs, sections, members] = await Promise.all([
+      context.supabase
+        .from("rfp_requirements")
+        .select("*")
+        .eq("rfp_id", data.rfpId)
+        .order("created_at"),
+      context.supabase
+        .from("proposal_sections")
+        .select("*")
+        .eq("rfp_id", data.rfpId)
+        .order("order_index"),
+      context.supabase.from("org_members").select("user_id").eq("org_id", rfp.data.org_id),
     ]);
-    if (rfp.error) throw new Error(rfp.error.message);
     return {
       rfp: rfp.data,
       requirements: reqs.data ?? [],
@@ -76,7 +93,10 @@ export const createRfp = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { data: prof } = await context.supabase
-      .from("profiles").select("current_org_id").eq("id", context.userId).single();
+      .from("profiles")
+      .select("current_org_id")
+      .eq("id", context.userId)
+      .single();
     if (!prof?.current_org_id) throw new Error("No active org");
     const { data: row, error } = await context.supabase
       .from("rfp_projects")
@@ -92,10 +112,16 @@ export const createRfp = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     // Seed default sections
-    const defaults = ["Executive Summary", "Technical Approach", "Past Performance", "Pricing", "Compliance Matrix"];
-    await context.supabase.from("proposal_sections").insert(
-      defaults.map((n, i) => ({ rfp_id: row.id, section_name: n, order_index: i })),
-    );
+    const defaults = [
+      "Executive Summary",
+      "Technical Approach",
+      "Past Performance",
+      "Pricing",
+      "Compliance Matrix",
+    ];
+    await context.supabase
+      .from("proposal_sections")
+      .insert(defaults.map((n, i) => ({ rfp_id: row.id, section_name: n, order_index: i })));
     await context.supabase.from("activity_log").insert({
       org_id: prof.current_org_id,
       actor: "System",
@@ -107,14 +133,18 @@ export const createRfp = createServerFn({ method: "POST" })
 export const updateRfpStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({
-      rfpId: z.string().uuid(),
-      status: z.enum(["ingestion", "parsing", "drafting", "review", "submitted"]),
-    }).parse(i),
+    z
+      .object({
+        rfpId: z.string().uuid(),
+        status: z.enum(["ingestion", "parsing", "drafting", "review", "submitted"]),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
-      .from("rfp_projects").update({ status: data.status }).eq("id", data.rfpId);
+      .from("rfp_projects")
+      .update({ status: data.status })
+      .eq("id", data.rfpId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -136,11 +166,15 @@ export const assignRequirement = createServerFn({ method: "POST" })
 export const updateRequirementStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ requirementId: z.string().uuid(), status: z.enum(["pending", "met", "warning"]) }).parse(i),
+    z
+      .object({ requirementId: z.string().uuid(), status: z.enum(["pending", "met", "warning"]) })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
-      .from("rfp_requirements").update({ status: data.status }).eq("id", data.requirementId);
+      .from("rfp_requirements")
+      .update({ status: data.status })
+      .eq("id", data.requirementId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -152,16 +186,23 @@ export const saveSectionEdits = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { data: cur } = await context.supabase
-      .from("proposal_sections").select("version_number").eq("id", data.sectionId).single();
+      .from("proposal_sections")
+      .select("version_number")
+      .eq("id", data.sectionId)
+      .single();
     const nextVersion = (cur?.version_number ?? 1) + 1;
     // Update the section first — RLS will reject unauthorized editors. Only after
     // a successful update do we record a version, so unauthorized callers can never
     // pollute section_versions with phantom history.
-    const { error } = await context.supabase
+    // Check update result with .select("id") to ensure RLS permitted update before creating history
+    const { data: updatedRows, error } = await context.supabase
       .from("proposal_sections")
       .update({ human_edits: data.content, version_number: nextVersion })
-      .eq("id", data.sectionId);
-    if (error) throw new Error(error.message);
+      .eq("id", data.sectionId)
+      .select("id");
+    if (error || !updatedRows || updatedRows.length === 0) {
+      throw new Error(error?.message || "Unauthorized or section not found");
+    }
     const { error: vErr } = await context.supabase.from("section_versions").insert({
       section_id: data.sectionId,
       content: data.content,
@@ -175,10 +216,12 @@ export const saveSectionEdits = createServerFn({ method: "POST" })
 export const updateSectionCompliance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({
-      sectionId: z.string().uuid(),
-      compliance_status: z.enum(["draft", "approved", "rejected", "needs_review"]),
-    }).parse(i),
+    z
+      .object({
+        sectionId: z.string().uuid(),
+        compliance_status: z.enum(["draft", "approved", "rejected", "needs_review"]),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
@@ -250,15 +293,20 @@ export const listLibrary = createServerFn({ method: "GET" })
 export const createLibraryItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({
-      title: z.string().min(1),
-      content_body: z.string().min(1),
-      tags: z.array(z.string()).default([]),
-    }).parse(i),
+    z
+      .object({
+        title: z.string().min(1),
+        content_body: z.string().min(1),
+        tags: z.array(z.string()).default([]),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     const { data: prof } = await context.supabase
-      .from("profiles").select("current_org_id").eq("id", context.userId).single();
+      .from("profiles")
+      .select("current_org_id")
+      .eq("id", context.userId)
+      .single();
     if (!prof?.current_org_id) throw new Error("No active org");
     const { error } = await context.supabase.from("content_library").insert({
       org_id: prof.current_org_id,
@@ -291,11 +339,17 @@ export const getDashboardKpis = createServerFn({ method: "GET" })
     const avgWin =
       active.length === 0
         ? 0
-        : Math.round(active.reduce((s, r) => s + Number(r.win_probability ?? 0), 0) / active.length);
+        : Math.round(
+            active.reduce((s, r) => s + Number(r.win_probability ?? 0), 0) / active.length,
+          );
     const flags = flagsCount ?? 0;
     const today = new Date();
     const upcoming = active
-      .map((r) => (r.due_date ? Math.ceil((new Date(r.due_date).getTime() - today.getTime()) / 86400000) : null))
+      .map((r) =>
+        r.due_date
+          ? Math.ceil((new Date(r.due_date).getTime() - today.getTime()) / 86400000)
+          : null,
+      )
       .filter((n): n is number => n !== null && n >= 0)
       .sort((a, b) => a - b)[0];
     return { totalValue, avgWin, flags, daysToNearest: upcoming ?? null };

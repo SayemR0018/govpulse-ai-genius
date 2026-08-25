@@ -4,19 +4,19 @@ import { cn } from "./utils";
 describe("cn utility function", () => {
   test("merges single and multiple class names", () => {
     expect(cn("px-2", "py-1")).toBe("px-2 py-1");
-    expect(cn("text-red-500", "font-bold", "bg-white")).toBe(
-      "text-red-500 font-bold bg-white"
-    );
+    expect(cn("text-red-500", "font-bold", "bg-white")).toBe("text-red-500 font-bold bg-white");
   });
 
   test("handles conditional and falsy values correctly", () => {
+    const isFalse = false;
+    const isTrue = true;
     expect(cn("px-2", null, undefined, false, 0, "")).toBe("px-2");
-    expect(cn("px-2", false && "py-1", true && "mt-4")).toBe("px-2 mt-4");
+    expect(cn("px-2", isFalse && "py-1", isTrue && "mt-4")).toBe("px-2 mt-4");
   });
 
   test("handles array and object syntax from clsx", () => {
     expect(cn(["px-2", "py-1"], { "text-red-500": true, "bg-blue-500": false })).toBe(
-      "px-2 py-1 text-red-500"
+      "px-2 py-1 text-red-500",
     );
   });
 
