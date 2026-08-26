@@ -5,7 +5,7 @@ import { renderErrorPage } from "./lib/error-page";
 
 declare const Bun: {
   env: Record<string, string | undefined>;
-  file: (path: string) => any;
+  file: (path: string) => { exists: () => Promise<boolean> };
   serve: (options: {
     port: number;
     hostname: string;

@@ -26,11 +26,14 @@ export const setRolePreview = createServerFn({ method: "POST" })
     z.object({ role: z.enum(["proposal_manager", "sme", "compliance_auditor"]) }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { data: updatedRows, error } = await context.supabase
       .from("profiles")
       .update({ current_role_preview: data.role })
-      .eq("id", context.userId);
-    if (error) throw new Error(error.message);
+      .eq("id", context.userId)
+      .select("id");
+    if (error || !updatedRows || updatedRows.length === 0) {
+      throw new Error(error?.message || "Unauthorized or profile not found");
+    }
     return { ok: true };
   });
 
@@ -141,11 +144,14 @@ export const updateRfpStatus = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { data: updatedRows, error } = await context.supabase
       .from("rfp_projects")
       .update({ status: data.status })
-      .eq("id", data.rfpId);
-    if (error) throw new Error(error.message);
+      .eq("id", data.rfpId)
+      .select("id");
+    if (error || !updatedRows || updatedRows.length === 0) {
+      throw new Error(error?.message || "Unauthorized or RFP not found");
+    }
     return { ok: true };
   });
 
@@ -155,11 +161,14 @@ export const assignRequirement = createServerFn({ method: "POST" })
     z.object({ requirementId: z.string().uuid(), userId: z.string().uuid().nullable() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { data: updatedRows, error } = await context.supabase
       .from("rfp_requirements")
       .update({ assigned_user_id: data.userId })
-      .eq("id", data.requirementId);
-    if (error) throw new Error(error.message);
+      .eq("id", data.requirementId)
+      .select("id");
+    if (error || !updatedRows || updatedRows.length === 0) {
+      throw new Error(error?.message || "Unauthorized or requirement not found");
+    }
     return { ok: true };
   });
 
@@ -171,11 +180,14 @@ export const updateRequirementStatus = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { data: updatedRows, error } = await context.supabase
       .from("rfp_requirements")
       .update({ status: data.status })
-      .eq("id", data.requirementId);
-    if (error) throw new Error(error.message);
+      .eq("id", data.requirementId)
+      .select("id");
+    if (error || !updatedRows || updatedRows.length === 0) {
+      throw new Error(error?.message || "Unauthorized or requirement not found");
+    }
     return { ok: true };
   });
 
@@ -224,11 +236,14 @@ export const updateSectionCompliance = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { data: updatedRows, error } = await context.supabase
       .from("proposal_sections")
       .update({ compliance_status: data.compliance_status })
-      .eq("id", data.sectionId);
-    if (error) throw new Error(error.message);
+      .eq("id", data.sectionId)
+      .select("id");
+    if (error || !updatedRows || updatedRows.length === 0) {
+      throw new Error(error?.message || "Unauthorized or section not found");
+    }
     return { ok: true };
   });
 

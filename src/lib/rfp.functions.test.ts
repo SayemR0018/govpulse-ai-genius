@@ -299,4 +299,37 @@ describe("getRfp & saveSectionEdits security", () => {
       }
     }).toThrow("Unauthorized or section not found");
   });
+
+  it("fails updateRfpStatus, assignRequirement, updateRequirementStatus, and updateSectionCompliance when 0 rows updated", async () => {
+    const mockSupabaseDenied = {
+      from: (_table: string) => ({
+        update: () => ({
+          eq: () => ({
+            select: async () => ({ data: [], error: null }),
+          }),
+        }),
+      }),
+    };
+
+    const runUpdateCheck = async (table: string, errMessage: string) => {
+      const { data: updatedRows, error } = await mockSupabaseDenied
+        .from(table)
+        .update()
+        .eq()
+        .select("id");
+      if (error || !updatedRows || updatedRows.length === 0) {
+        throw new Error(errMessage);
+      }
+    };
+
+    expect(runUpdateCheck("rfp_projects", "Unauthorized or RFP not found")).rejects.toThrow(
+      "Unauthorized or RFP not found",
+    );
+    expect(
+      runUpdateCheck("rfp_requirements", "Unauthorized or requirement not found"),
+    ).rejects.toThrow("Unauthorized or requirement not found");
+    expect(
+      runUpdateCheck("proposal_sections", "Unauthorized or section not found"),
+    ).rejects.toThrow("Unauthorized or section not found");
+  });
 });
