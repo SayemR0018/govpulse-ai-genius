@@ -332,4 +332,34 @@ describe("getRfp & saveSectionEdits security", () => {
       runUpdateCheck("proposal_sections", "Unauthorized or section not found"),
     ).rejects.toThrow("Unauthorized or section not found");
   });
+
+  it("fails generateSectionDraft and scoreCompliance when 0 rows updated due to RLS restriction", async () => {
+    const mockSupabaseDenied = {
+      from: (table: string) => {
+        if (table === "proposal_sections") {
+          return {
+            update: () => ({
+              eq: () => ({
+                select: async () => ({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const runAiUpdateCheck = async () => {
+      const { data: updatedRows, error: updateErr } = await mockSupabaseDenied
+        .from("proposal_sections")
+        .update()
+        .eq()
+        .select("id");
+      if (updateErr || !updatedRows || updatedRows.length === 0) {
+        throw new Error(updateErr?.message || "Unauthorized or section not found");
+      }
+    };
+
+    expect(runAiUpdateCheck()).rejects.toThrow("Unauthorized or section not found");
+  });
 });

@@ -78,10 +78,15 @@ export const generateSectionDraft = createServerFn({ method: "POST" })
           "You are an expert federal proposal writer. Use clear, evidence-driven prose. Avoid filler.",
         prompt: `Write a concise, persuasive draft for the proposal section titled "${section.section_name}". Address these requirements:\n${reqList}\n\n${data.instructions ?? ""}`,
       });
-      await context.supabase
+      // Verify update with .select("id") because Supabase returns error: null on RLS blocks
+      const { data: updatedRows, error: updateErr } = await context.supabase
         .from("proposal_sections")
         .update({ ai_draft: draft })
-        .eq("id", data.sectionId);
+        .eq("id", data.sectionId)
+        .select("id");
+      if (updateErr || !updatedRows || updatedRows.length === 0) {
+        throw new Error(updateErr?.message || "Unauthorized or section not found");
+      }
       return { draft };
     } catch (err) {
       console.error("[AI Functions] generateSectionDraft failed:", err);
@@ -169,10 +174,15 @@ export const scoreCompliance = createServerFn({ method: "POST" })
         schema: z.object({ score: z.number().min(0).max(100), gaps: z.array(z.string()).max(8) }),
         prompt: `Score how well this draft addresses the requirements (0-100) and list specific gaps.\nREQUIREMENTS:\n${(reqs ?? []).map((r) => `- [${r.risk_level}] ${r.text_snippet}`).join("\n")}\n\nDRAFT:\n${draftContent}`,
       });
-      await context.supabase
+      // Verify update with .select("id") because Supabase returns error: null on RLS blocks
+      const { data: updatedRows, error: updateErr } = await context.supabase
         .from("proposal_sections")
         .update({ compliance_score: object.score })
-        .eq("id", data.sectionId);
+        .eq("id", data.sectionId)
+        .select("id");
+      if (updateErr || !updatedRows || updatedRows.length === 0) {
+        throw new Error(updateErr?.message || "Unauthorized or section not found");
+      }
       return object;
     } catch (err) {
       console.error("[AI Functions] scoreCompliance failed:", err);
