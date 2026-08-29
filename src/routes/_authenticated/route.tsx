@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useUiStore, type RolePreview } from "@/stores/ui";
+import { setRolePreview } from "@/lib/rfp.functions";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -62,12 +63,13 @@ function AppShell() {
   }
 
   async function switchRole(r: RolePreview) {
-    setRole(r);
-    await supabase
-      .from("profiles")
-      .update({ current_role_preview: r as never })
-      .eq("id", (await supabase.auth.getUser()).data.user!.id);
-    toast.success(`Viewing as ${r.replace("_", " ")}`);
+    try {
+      await setRolePreview({ data: { role: r } });
+      setRole(r);
+      toast.success(`Viewing as ${r.replace("_", " ")}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update role");
+    }
   }
 
   return (
