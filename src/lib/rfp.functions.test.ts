@@ -300,7 +300,7 @@ describe("getRfp & saveSectionEdits security", () => {
     }).toThrow("Unauthorized or section not found");
   });
 
-  it("fails updateRfpStatus, assignRequirement, updateRequirementStatus, and updateSectionCompliance when 0 rows updated", async () => {
+  it("fails updateRfpStatus, assignRequirement, updateRequirementStatus, updateSectionCompliance, generateSectionDraft, and scoreCompliance when 0 rows updated", async () => {
     const mockSupabaseDenied = {
       from: (_table: string) => ({
         update: () => ({
