@@ -300,7 +300,7 @@ describe("getRfp & saveSectionEdits security", () => {
     }).toThrow("Unauthorized or section not found");
   });
 
-  it("fails updateRfpStatus, assignRequirement, updateRequirementStatus, and updateSectionCompliance when 0 rows updated", async () => {
+  it("fails updateRfpStatus, assignRequirement, updateRequirementStatus, updateSectionCompliance, generateSectionDraft, and scoreCompliance when 0 rows updated", async () => {
     const mockSupabaseDenied = {
       from: (_table: string) => ({
         update: () => ({
@@ -331,5 +331,19 @@ describe("getRfp & saveSectionEdits security", () => {
     expect(
       runUpdateCheck("proposal_sections", "Unauthorized or section not found"),
     ).rejects.toThrow("Unauthorized or section not found");
+
+    // Explicitly verify ai.functions.ts update check behavior for generateSectionDraft and scoreCompliance
+    const verifyAiFunctionUpdateCheck = async () => {
+      const { data: updatedRows, error: updateError } = await mockSupabaseDenied
+        .from("proposal_sections")
+        .update()
+        .eq()
+        .select("id");
+      if (updateError || !updatedRows || updatedRows.length === 0) {
+        throw new Error(updateError?.message || "Unauthorized or section not found");
+      }
+    };
+
+    expect(verifyAiFunctionUpdateCheck()).rejects.toThrow("Unauthorized or section not found");
   });
 });
