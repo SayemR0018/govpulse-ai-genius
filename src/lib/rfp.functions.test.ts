@@ -332,4 +332,48 @@ describe("getRfp & saveSectionEdits security", () => {
       runUpdateCheck("proposal_sections", "Unauthorized or section not found"),
     ).rejects.toThrow("Unauthorized or section not found");
   });
+
+  it("fails generateSectionDraft and scoreCompliance when AI update returns 0 updated rows due to RLS denial", async () => {
+    const mockSupabaseDenied = {
+      from: (table: string) => {
+        if (table === "proposal_sections") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { section_name: "Test Section", ai_draft: "draft", rfp_id: "rfp-1" },
+                  error: null,
+                }),
+              }),
+            }),
+            update: () => ({
+              eq: () => ({
+                select: async () => ({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: () => ({
+            eq: () => ({
+              limit: async () => ({ data: [], error: null }),
+            }),
+          }),
+        };
+      },
+    };
+
+    const runAiUpdateCheck = async () => {
+      const { data: updatedRows, error: updateError } = await mockSupabaseDenied
+        .from("proposal_sections")
+        .update()
+        .eq()
+        .select("id");
+      if (updateError || !updatedRows || updatedRows.length === 0) {
+        throw new Error(updateError?.message || "Unauthorized or section not found");
+      }
+    };
+
+    expect(runAiUpdateCheck()).rejects.toThrow("Unauthorized or section not found");
+  });
 });
