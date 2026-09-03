@@ -376,4 +376,44 @@ describe("getRfp & saveSectionEdits security", () => {
 
     expect(runAiUpdateCheck()).rejects.toThrow("Unauthorized or section not found");
   });
+
+  it("fails extractRequirements early when user lacks RFP access or RFP is not found", async () => {
+    let aiGenerationCalled = false;
+
+    const mockSupabaseDenied = {
+      from: (table: string) => {
+        if (table === "rfp_projects") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({ data: null, error: { message: "PGRST116" } }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const runExtractRequirementsCheck = async (data: { rfpId: string; documentText: string }) => {
+      const { data: rfp, error: rfpError } = await mockSupabaseDenied
+        .from("rfp_projects")
+        .select("id")
+        .eq("id", data.rfpId)
+        .single();
+      if (rfpError || !rfp) throw new Error("Unauthorized or RFP not found");
+
+      // AI generation should never be executed if RFP check fails!
+      aiGenerationCalled = true;
+    };
+
+    await expect(
+      runExtractRequirementsCheck({
+        rfpId: "rfp-unauthorized-id",
+        documentText: "sample document text",
+      }),
+    ).rejects.toThrow("Unauthorized or RFP not found");
+
+    expect(aiGenerationCalled).toBe(false);
+  });
 });

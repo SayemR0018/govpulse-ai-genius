@@ -18,6 +18,13 @@ export const extractRequirements = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
+    const { data: rfp, error: rfpError } = await context.supabase
+      .from("rfp_projects")
+      .select("id")
+      .eq("id", data.rfpId)
+      .single();
+    if (rfpError || !rfp) throw new Error("Unauthorized or RFP not found");
+
     try {
       const { createLovableAiGatewayProvider, DEFAULT_MODEL } =
         await import("@/lib/ai-gateway.server");
@@ -36,8 +43,13 @@ export const extractRequirements = createServerFn({ method: "POST" })
         status: "pending" as const,
       }));
       if (rows.length === 0) return { count: 0 };
-      const { error } = await context.supabase.from("rfp_requirements").insert(rows);
-      if (error) throw new Error(error.message);
+      const { data: insertedRows, error } = await context.supabase
+        .from("rfp_requirements")
+        .insert(rows)
+        .select("id");
+      if (error || !insertedRows || insertedRows.length === 0) {
+        throw new Error(error?.message || "Unauthorized or failed to insert requirements");
+      }
       return { count: rows.length };
     } catch (err) {
       console.error("[AI Functions] extractRequirements failed:", err);
