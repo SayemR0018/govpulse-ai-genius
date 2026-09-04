@@ -300,7 +300,7 @@ describe("getRfp & saveSectionEdits security", () => {
     }).toThrow("Unauthorized or section not found");
   });
 
-  it("fails updateRfpStatus, assignRequirement, updateRequirementStatus, and updateSectionCompliance when 0 rows updated", async () => {
+  it("fails setRolePreview, updateRfpStatus, assignRequirement, updateRequirementStatus, and updateSectionCompliance when 0 rows updated", async () => {
     const mockSupabaseDenied = {
       from: (_table: string) => ({
         update: () => ({
@@ -322,6 +322,9 @@ describe("getRfp & saveSectionEdits security", () => {
       }
     };
 
+    expect(runUpdateCheck("profiles", "Unauthorized or profile not found")).rejects.toThrow(
+      "Unauthorized or profile not found",
+    );
     expect(runUpdateCheck("rfp_projects", "Unauthorized or RFP not found")).rejects.toThrow(
       "Unauthorized or RFP not found",
     );
