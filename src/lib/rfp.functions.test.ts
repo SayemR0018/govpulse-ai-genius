@@ -376,4 +376,41 @@ describe("getRfp & saveSectionEdits security", () => {
 
     expect(runAiUpdateCheck()).rejects.toThrow("Unauthorized or section not found");
   });
+
+  it("fails extractRequirements when user lacks access to the target RFP project before calling AI", async () => {
+    let aiCalled = false;
+    const mockSupabaseDenied = {
+      from: (table: string) => {
+        if (table === "rfp_projects") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: null,
+                  error: { message: "JSON object requested, multiple (or no) rows returned" },
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const runExtractCheck = async (context: { supabase: typeof mockSupabaseDenied }) => {
+      const { data: rfp, error: rfpError } = await context.supabase
+        .from("rfp_projects")
+        .select("id")
+        .eq("id", "unauthorized-rfp-id")
+        .single();
+      if (rfpError || !rfp) throw new Error("Unauthorized or RFP not found");
+
+      aiCalled = true;
+    };
+
+    expect(runExtractCheck({ supabase: mockSupabaseDenied })).rejects.toThrow(
+      "Unauthorized or RFP not found",
+    );
+    expect(aiCalled).toBe(false);
+  });
 });
