@@ -16,6 +16,14 @@ export const extractRequirements = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    // Verify user access to the target RFP project before calling external AI gateway
+    const { data: rfp, error: rfpError } = await context.supabase
+      .from("rfp_projects")
+      .select("id")
+      .eq("id", data.rfpId)
+      .single();
+    if (rfpError || !rfp) throw new Error("Unauthorized or RFP not found");
+
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
     try {
