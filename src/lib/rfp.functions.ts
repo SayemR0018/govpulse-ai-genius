@@ -265,6 +265,14 @@ export const addComment = createServerFn({ method: "POST" })
     z.object({ sectionId: z.string().uuid(), text: z.string().min(1).max(2000) }).parse(i),
   )
   .handler(async ({ data, context }) => {
+    // Verify section access before inserting comment
+    const { data: section, error: secError } = await context.supabase
+      .from("proposal_sections")
+      .select("id")
+      .eq("id", data.sectionId)
+      .single();
+    if (secError || !section) throw new Error("Unauthorized or section not found");
+
     const { error } = await context.supabase
       .from("workspace_comments")
       .insert({ section_id: data.sectionId, user_id: context.userId, text: data.text });

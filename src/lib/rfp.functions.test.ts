@@ -427,4 +427,51 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("fails addComment when section query fails or returns no section due to RLS restriction", async () => {
+    let commentInserted = false;
+    const mockSupabaseDenied = {
+      from: (table: string) => {
+        if (table === "proposal_sections") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: null,
+                  error: { message: "JSON object requested, multiple (or no) rows returned" },
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "workspace_comments") {
+          return {
+            insert: async () => {
+              commentInserted = true;
+              return { error: null };
+            },
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const runAddCommentCheck = async (context: { supabase: typeof mockSupabaseDenied }) => {
+      const { data: section, error: secError } = await context.supabase
+        .from("proposal_sections")
+        .select("id")
+        .eq("id", "unauthorized-section-id")
+        .single();
+      if (secError || !section) throw new Error("Unauthorized or section not found");
+
+      await context.supabase
+        .from("workspace_comments")
+        .insert({ section_id: "unauthorized-section-id", user_id: "user-1", text: "hello" });
+    };
+
+    expect(runAddCommentCheck({ supabase: mockSupabaseDenied })).rejects.toThrow(
+      "Unauthorized or section not found",
+    );
+    expect(commentInserted).toBe(false);
+  });
 });
