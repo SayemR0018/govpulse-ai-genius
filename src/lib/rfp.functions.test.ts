@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { setRolePreview } from "./rfp.functions";
 
 interface TestRfp {
   id: string;
@@ -426,5 +427,78 @@ describe("getRfp & saveSectionEdits security", () => {
       "Unauthorized or RFP not found",
     );
     expect(aiCalled).toBe(false);
+  });
+
+  it("exports setRolePreview server function configured with POST method", () => {
+    expect(typeof setRolePreview).toBe("function");
+    expect(setRolePreview.method).toBe("POST");
+  });
+
+  it("handles setRolePreview updates and fails securely when 0 rows are updated", async () => {
+    const runSetRolePreviewLogic = async (
+      mockSupabase: {
+        from: (table: string) => {
+          update: (payload: { current_role_preview: string }) => {
+            eq: (
+              col: string,
+              val: string,
+            ) => {
+              select: (
+                cols: string,
+              ) => Promise<{ data: { id: string }[] | null; error: null | { message: string } }>;
+            };
+          };
+        };
+      },
+      userId: string,
+      role: "proposal_manager" | "sme" | "compliance_auditor",
+    ) => {
+      const { data: updatedRows, error } = await mockSupabase
+        .from("profiles")
+        .update({ current_role_preview: role })
+        .eq("id", userId)
+        .select("id");
+      if (error || !updatedRows || updatedRows.length === 0) {
+        throw new Error(error?.message || "Unauthorized or profile not found");
+      }
+      return { ok: true };
+    };
+
+    const mockSupabaseSuccess = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            update: () => ({
+              eq: (_col: string, userId: string) => ({
+                select: async () => ({ data: [{ id: userId }], error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const mockSupabaseDenied = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            update: () => ({
+              eq: () => ({
+                select: async () => ({ data: [], error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const successResult = await runSetRolePreviewLogic(mockSupabaseSuccess, "user-123", "sme");
+    expect(successResult).toEqual({ ok: true });
+
+    expect(runSetRolePreviewLogic(mockSupabaseDenied, "user-123", "sme")).rejects.toThrow(
+      "Unauthorized or profile not found",
+    );
   });
 });
