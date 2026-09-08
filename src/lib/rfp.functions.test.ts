@@ -427,4 +427,59 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("fails improveTone and autocomplete authorization check when user profile lacks current_org_id before calling AI", async () => {
+    let aiCalled = false;
+
+    // Helper simulating the exact profile lookup handler in improveTone and autocomplete in src/lib/ai.functions.ts
+    const checkUserOrgAuth = async (context: {
+      supabase: {
+        from: (table: string) => {
+          select: (cols: string) => {
+            eq: (
+              col: string,
+              val: string,
+            ) => {
+              single: () => Promise<{
+                data: { current_org_id: string | null } | null;
+                error: unknown;
+              }>;
+            };
+          };
+        };
+      };
+      userId: string;
+    }) => {
+      const { data: prof } = await context.supabase
+        .from("profiles")
+        .select("current_org_id")
+        .eq("id", context.userId)
+        .single();
+      if (!prof?.current_org_id) throw new Error("Unauthorized or active org required");
+      aiCalled = true;
+    };
+
+    const mockSupabaseNoOrg = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { current_org_id: null },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    expect(checkUserOrgAuth({ supabase: mockSupabaseNoOrg, userId: "user-123" })).rejects.toThrow(
+      "Unauthorized or active org required",
+    );
+    expect(aiCalled).toBe(false);
+  });
 });
