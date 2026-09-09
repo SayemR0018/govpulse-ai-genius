@@ -111,7 +111,14 @@ export const improveTone = createServerFn({ method: "POST" })
       })
       .parse(i),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { data: prof } = await context.supabase
+      .from("profiles")
+      .select("current_org_id")
+      .eq("id", context.userId)
+      .single();
+    if (!prof?.current_org_id) throw new Error("Unauthorized or active org required");
+
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
     try {
@@ -135,7 +142,14 @@ export const autocomplete = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ precedingText: z.string().min(1).max(50000) }).parse(i),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { data: prof } = await context.supabase
+      .from("profiles")
+      .select("current_org_id")
+      .eq("id", context.userId)
+      .single();
+    if (!prof?.current_org_id) throw new Error("Unauthorized or active org required");
+
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY missing");
     try {
