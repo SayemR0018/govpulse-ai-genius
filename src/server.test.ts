@@ -2,6 +2,18 @@ import { describe, expect, it } from "bun:test";
 import path from "node:path";
 import serverExport from "./server";
 
+describe("Server HTTP security headers", () => {
+  it("attaches security headers to server responses", async () => {
+    const req = new Request("http://localhost/test-route");
+    const res = await serverExport.fetch(req);
+
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(res.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+    expect(res.headers.get("X-XSS-Protection")).toBe("0");
+  });
+});
+
 describe("Server static asset path traversal protection", () => {
   it("prevents path traversal outside dist/client", async () => {
     // Attempt directory traversal to read server code from dist/server/server.js
