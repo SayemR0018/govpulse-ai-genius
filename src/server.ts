@@ -51,54 +51,80 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 const PORT = Number(process.env.PORT || (typeof Bun !== "undefined" && Bun.env.PORT) || 3000);
 const HOST = "0.0.0.0";
 
+function applySecurityHeaders(response: Response): Response {
+  try {
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    response.headers.set("X-Frame-Options", "DENY");
+    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    response.headers.set("X-XSS-Protection", "0");
+    return response;
+  } catch {
+    const headers = new Headers(response.headers);
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("X-Frame-Options", "DENY");
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    headers.set("X-XSS-Protection", "0");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+}
+
+async function handleRequest(request: Request, env?: unknown, ctx?: unknown): Promise<Response> {
+  const url = new URL(request.url);
+
+  // Serve static client assets in production if using Bun runtime safely against path traversal
+  if (typeof Bun !== "undefined") {
+    let rawPath = url.pathname;
+    try {
+      rawPath = decodeURIComponent(url.pathname);
+    } catch {
+      // invalid URL encoding, default to url.pathname
+    }
+    const clientDir = path.resolve("./dist/client");
+    const targetPath = path.resolve(clientDir, "." + rawPath);
+
+    // Enforce path containment within ./dist/client to prevent directory traversal attacks
+    if (targetPath.startsWith(clientDir + path.sep) || targetPath === clientDir) {
+      const staticFile = Bun.file(targetPath);
+      if (await staticFile.exists()) {
+        return new Response(staticFile);
+      }
+    }
+  }
+
+  try {
+    const handler = await getServerEntry();
+    const response = await handler.fetch(request, env, ctx);
+
+    // If TanStack Start SSR return 404 for a route, check if client static assets/index.html fallback exists
+    if (response.status === 404 && typeof Bun !== "undefined") {
+      const clientIndex = Bun.file("./dist/client/index.html");
+      if (await clientIndex.exists()) {
+        return new Response(clientIndex, {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      }
+    }
+
+    return await normalizeCatastrophicSsrResponse(response);
+  } catch (error) {
+    console.error(error);
+    return new Response(renderErrorPage(), {
+      status: 500,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+}
+
 const serverExport = {
   port: PORT,
   hostname: HOST,
   async fetch(request: Request, env?: unknown, ctx?: unknown) {
-    const url = new URL(request.url);
-
-    // Serve static client assets in production if using Bun runtime safely against path traversal
-    if (typeof Bun !== "undefined") {
-      let rawPath = url.pathname;
-      try {
-        rawPath = decodeURIComponent(url.pathname);
-      } catch {
-        // invalid URL encoding, default to url.pathname
-      }
-      const clientDir = path.resolve("./dist/client");
-      const targetPath = path.resolve(clientDir, "." + rawPath);
-
-      // Enforce path containment within ./dist/client to prevent directory traversal attacks
-      if (targetPath.startsWith(clientDir + path.sep) || targetPath === clientDir) {
-        const staticFile = Bun.file(targetPath);
-        if (await staticFile.exists()) {
-          return new Response(staticFile);
-        }
-      }
-    }
-
-    try {
-      const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-
-      // If TanStack Start SSR return 404 for a route, check if client static assets/index.html fallback exists
-      if (response.status === 404 && typeof Bun !== "undefined") {
-        const clientIndex = Bun.file("./dist/client/index.html");
-        if (await clientIndex.exists()) {
-          return new Response(clientIndex, {
-            headers: { "content-type": "text/html; charset=utf-8" },
-          });
-        }
-      }
-
-      return await normalizeCatastrophicSsrResponse(response);
-    } catch (error) {
-      console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
-    }
+    const response = await handleRequest(request, env, ctx);
+    return applySecurityHeaders(response);
   },
 };
 
