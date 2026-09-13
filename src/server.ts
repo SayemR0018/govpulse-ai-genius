@@ -29,6 +29,28 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
+// Attaches standard HTTP security headers to all server responses to protect against MIME-sniffing, clickjacking, and XSS risks
+function attachSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  if (!headers.has("X-Content-Type-Options")) {
+    headers.set("X-Content-Type-Options", "nosniff");
+  }
+  if (!headers.has("X-Frame-Options")) {
+    headers.set("X-Frame-Options", "DENY");
+  }
+  if (!headers.has("Referrer-Policy")) {
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  }
+  if (!headers.has("X-XSS-Protection")) {
+    headers.set("X-XSS-Protection", "0");
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 // h3 swallows in-handler throws into a normal 500 Response with body
 // {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
@@ -72,7 +94,7 @@ const serverExport = {
       if (targetPath.startsWith(clientDir + path.sep) || targetPath === clientDir) {
         const staticFile = Bun.file(targetPath);
         if (await staticFile.exists()) {
-          return new Response(staticFile);
+          return attachSecurityHeaders(new Response(staticFile));
         }
       }
     }
@@ -85,19 +107,23 @@ const serverExport = {
       if (response.status === 404 && typeof Bun !== "undefined") {
         const clientIndex = Bun.file("./dist/client/index.html");
         if (await clientIndex.exists()) {
-          return new Response(clientIndex, {
-            headers: { "content-type": "text/html; charset=utf-8" },
-          });
+          return attachSecurityHeaders(
+            new Response(clientIndex, {
+              headers: { "content-type": "text/html; charset=utf-8" },
+            }),
+          );
         }
       }
 
-      return await normalizeCatastrophicSsrResponse(response);
+      return attachSecurityHeaders(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return attachSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };
