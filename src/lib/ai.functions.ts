@@ -172,12 +172,12 @@ export const scoreCompliance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ sectionId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { data: section } = await context.supabase
+    const { data: section, error: sectionError } = await context.supabase
       .from("proposal_sections")
       .select("section_name, ai_draft, human_edits, rfp_id")
       .eq("id", data.sectionId)
       .single();
-    if (!section) throw new Error("not found");
+    if (sectionError || !section) throw new Error("Unauthorized or section not found");
 
     try {
       const { data: reqs } = await context.supabase
