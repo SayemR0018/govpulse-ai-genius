@@ -23,6 +23,16 @@ describe("Server static asset path traversal protection", () => {
     }
   });
 
+  it("attaches security headers to server responses", async () => {
+    const req = new Request("http://localhost/non-existent-route");
+    const res = await serverExport.fetch(req);
+
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(res.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+    expect(res.headers.get("X-XSS-Protection")).toBe("0");
+  });
+
   it("safely computes targetPath within dist/client directory", () => {
     const clientDir = path.resolve("./dist/client");
 
