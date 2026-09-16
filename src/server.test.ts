@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import path from "node:path";
-import serverExport from "./server";
+import serverExportRaw from "./server";
+
+const serverExport = serverExportRaw as { fetch: (req: Request) => Promise<Response> };
 
 describe("Server static asset path traversal protection", () => {
   it("prevents path traversal outside dist/client", async () => {
@@ -41,5 +43,17 @@ describe("Server static asset path traversal protection", () => {
     expect(checkPath("/../server/server.js")).toBe(false);
     expect(checkPath("/%2e%2e/server/server.js")).toBe(false);
     expect(checkPath("/%2e%2e/%2e%2e/package.json")).toBe(false);
+  });
+});
+
+describe("Server security headers", () => {
+  it("attaches standard HTTP security headers to server responses", async () => {
+    const req = new Request("http://localhost/");
+    const res = await serverExport.fetch(req);
+
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(res.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+    expect(res.headers.get("X-XSS-Protection")).toBe("0");
   });
 });
