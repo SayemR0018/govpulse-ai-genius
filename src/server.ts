@@ -29,6 +29,32 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
+/**
+ * Attaches standard HTTP security headers to server responses
+ * to prevent MIME sniffing, clickjacking, and cross-origin data exposure.
+ */
+function withSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  if (!headers.has("X-Content-Type-Options")) {
+    headers.set("X-Content-Type-Options", "nosniff");
+  }
+  if (!headers.has("X-Frame-Options")) {
+    headers.set("X-Frame-Options", "DENY");
+  }
+  if (!headers.has("Referrer-Policy")) {
+    headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  }
+  if (!headers.has("X-XSS-Protection")) {
+    headers.set("X-XSS-Protection", "0");
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 // h3 swallows in-handler throws into a normal 500 Response with body
 // {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
@@ -72,7 +98,7 @@ const serverExport = {
       if (targetPath.startsWith(clientDir + path.sep) || targetPath === clientDir) {
         const staticFile = Bun.file(targetPath);
         if (await staticFile.exists()) {
-          return new Response(staticFile);
+          return withSecurityHeaders(new Response(staticFile as unknown as BodyInit));
         }
       }
     }
@@ -85,19 +111,24 @@ const serverExport = {
       if (response.status === 404 && typeof Bun !== "undefined") {
         const clientIndex = Bun.file("./dist/client/index.html");
         if (await clientIndex.exists()) {
-          return new Response(clientIndex, {
-            headers: { "content-type": "text/html; charset=utf-8" },
-          });
+          return withSecurityHeaders(
+            new Response(clientIndex as unknown as BodyInit, {
+              headers: { "content-type": "text/html; charset=utf-8" },
+            }),
+          );
         }
       }
 
-      return await normalizeCatastrophicSsrResponse(response);
+      const finalResponse = await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(finalResponse);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return withSecurityHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };
