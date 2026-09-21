@@ -43,3 +43,15 @@ describe("Server static asset path traversal protection", () => {
     expect(checkPath("/%2e%2e/%2e%2e/package.json")).toBe(false);
   });
 });
+
+describe("Server HTTP security headers", () => {
+  it("attaches security headers to server responses", async () => {
+    const req = new Request("http://localhost/");
+    const res = await serverExport.fetch(req);
+
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(res.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+    expect(res.headers.get("X-XSS-Protection")).toBe("0");
+  });
+});
