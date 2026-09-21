@@ -9,3 +9,9 @@
 **Vulnerability:** Constructing static file paths via string concatenation (`./dist/client${url.pathname}`) in `Bun.file()` allows path traversal attacks (e.g., `/%2e%2e/server/server.js`) to read arbitrary files outside the client assets root directory.
 **Learning:** `Bun.file()` automatically resolves `..` relative path components. Unless `url.pathname` is URL-decoded and checked via `path.resolve(...)` against the base directory root (`.startsWith(baseDir + path.sep)`), relative traversal paths can escape `dist/client`.
 **Prevention:** Always decode URI components and resolve target paths using `path.resolve(baseDir, "." + decodedPath)` and verify `targetPath.startsWith(baseDir + path.sep) || targetPath === baseDir` before passing to `Bun.file()`.
+
+## 2025-05-20 - Scope Organization Queries in Profile Server Functions
+
+**Vulnerability:** `getMyProfile` executed an unfiltered query on the `organizations` table (`.select("id, name, plan_tier")`), exposing all tenant organization names and plan tiers to any authenticated user regardless of their organization memberships.
+**Learning:** Querying metadata tables without scoping to the caller's assigned `org_id`s (from `user_roles`) leaks cross-tenant organization records.
+**Prevention:** Query `user_roles` for `context.userId` first to collect valid `org_id`s, and filter `organizations` using `.in("id", orgIds)` to enforce strict tenant isolation.

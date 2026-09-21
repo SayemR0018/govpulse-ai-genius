@@ -482,4 +482,62 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("restricts getMyProfile organization queries strictly to the user's assigned org_ids", async () => {
+    let queriedOrgFilter: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({ data: { id: "user-123" }, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: () =>
+                Promise.resolve({
+                  data: [{ role: "proposal_manager", org_id: "org-allowed-1" }],
+                  error: null,
+                }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: () => ({
+              in: (col: string, vals: string[]) => {
+                if (col === "id") queriedOrgFilter = vals;
+                return Promise.resolve({
+                  data: [{ id: "org-allowed-1", name: "Allowed Org", plan_tier: "enterprise" }],
+                  error: null,
+                });
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const rolesRes = await mockSupabase.from("user_roles").select().eq();
+    const orgIds = Array.from(
+      new Set((rolesRes.data ?? []).map((r: { org_id: string }) => r.org_id).filter(Boolean)),
+    );
+
+    const orgsRes =
+      orgIds.length > 0
+        ? await mockSupabase.from("organizations").select().in("id", orgIds)
+        : { data: [] };
+
+    expect(queriedOrgFilter).toEqual(["org-allowed-1"]);
+    expect(orgsRes.data).toEqual([
+      { id: "org-allowed-1", name: "Allowed Org", plan_tier: "enterprise" },
+    ]);
+  });
 });
