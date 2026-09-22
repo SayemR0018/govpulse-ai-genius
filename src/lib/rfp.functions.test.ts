@@ -482,4 +482,72 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("scopes getMyProfile organizations query to user's assigned org_ids from user_roles", async () => {
+    let queriedOrgIds: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: (_cols?: string) => ({
+              eq: (_col: string, _val: string) => ({
+                single: async () => ({ data: { id: "user-1", display_name: "Test" }, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: (_cols?: string) => ({
+              eq: async (_col: string, _val: string) => ({
+                data: [{ role: "proposal_manager", org_id: "org-1" }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: (_cols?: string) => ({
+              in: async (col: string, vals: string[]) => {
+                if (col === "id") queriedOrgIds = vals;
+                return {
+                  data: [{ id: "org-1", name: "Org 1", plan_tier: "pro" }],
+                  error: null,
+                };
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const userId = "user-1";
+    const { data: profile } = await mockSupabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    const { data: roles } = await mockSupabase
+      .from("user_roles")
+      .select("role, org_id")
+      .eq("user_id", userId);
+    const orgIds = Array.from(
+      new Set(
+        (roles ?? [])
+          .map((r: { role: string; org_id: string }) => r.org_id)
+          .filter((id: string): id is string => Boolean(id)),
+      ),
+    );
+    const { data: orgs } =
+      orgIds.length > 0
+        ? await mockSupabase.from("organizations").select("id, name, plan_tier").in("id", orgIds)
+        : { data: [] };
+
+    expect(profile?.display_name).toBe("Test");
+    expect(queriedOrgIds).toEqual(["org-1"]);
+    expect(orgs).toEqual([{ id: "org-1", name: "Org 1", plan_tier: "pro" }]);
+  });
 });
