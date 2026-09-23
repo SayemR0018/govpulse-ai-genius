@@ -7,7 +7,9 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { setRolePreview } from "@/lib/rfp.functions";
 import {
   LayoutDashboard,
   FileInput,
@@ -44,6 +46,7 @@ function AppShell() {
   const navigate = useNavigate();
   const role = useUiStore((s) => s.role);
   const setRole = useUiStore((s) => s.setRole);
+  const setRolePreviewFn = useServerFn(setRolePreview);
 
   useEffect(() => {
     supabase
@@ -63,11 +66,12 @@ function AppShell() {
 
   async function switchRole(r: RolePreview) {
     setRole(r);
-    await supabase
-      .from("profiles")
-      .update({ current_role_preview: r as never })
-      .eq("id", (await supabase.auth.getUser()).data.user!.id);
-    toast.success(`Viewing as ${r.replace("_", " ")}`);
+    try {
+      await setRolePreviewFn({ data: { role: r } });
+      toast.success(`Viewing as ${r.replace("_", " ")}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update role");
+    }
   }
 
   return (
