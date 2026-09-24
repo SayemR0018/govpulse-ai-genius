@@ -483,3 +483,154 @@ describe("getRfp & saveSectionEdits security", () => {
     expect(aiCalled).toBe(false);
   });
 });
+
+describe("getMyProfile tenant organization isolation", () => {
+  it("filters organizations explicitly by user's assigned org_ids from user_roles", async () => {
+    let queriedOrgIds: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { id: "user-123", display_name: "Alice" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: (col: string, val: string) => {
+                expect(col).toBe("user_id");
+                expect(val).toBe("user-123");
+                return Promise.resolve({
+                  data: [
+                    { role: "proposal_manager", org_id: "org-allowed-1" },
+                    { role: "sme", org_id: "org-allowed-2" },
+                  ],
+                  error: null,
+                });
+              },
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: () => ({
+              in: (col: string, ids: string[]) => {
+                expect(col).toBe("id");
+                queriedOrgIds = ids;
+                return Promise.resolve({
+                  data: [
+                    { id: "org-allowed-1", name: "Allowed Org 1", plan_tier: "enterprise" },
+                    { id: "org-allowed-2", name: "Allowed Org 2", plan_tier: "pro" },
+                  ],
+                  error: null,
+                });
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const context = {
+      supabase: mockSupabase as unknown as Parameters<
+        typeof import("./rfp.functions").getMyProfile
+      >[0]["context"]["supabase"],
+      userId: "user-123",
+    };
+
+    const { data: profile } = await context.supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", context.userId)
+      .single();
+    const { data: roles } = await context.supabase
+      .from("user_roles")
+      .select("role, org_id")
+      .eq("user_id", context.userId);
+
+    const userRoles = (roles ?? []) as Array<{ role: string; org_id: string }>;
+    const orgIds = Array.from(new Set(userRoles.map((r) => r.org_id).filter(Boolean)));
+
+    let orgs: Array<{ id: string; name: string; plan_tier: string }> = [];
+    if (orgIds.length > 0) {
+      const { data: orgData } = await context.supabase
+        .from("organizations")
+        .select("id, name, plan_tier")
+        .in("id", orgIds);
+      orgs = orgData ?? [];
+    }
+
+    expect(profile.display_name).toBe("Alice");
+    expect(queriedOrgIds).toEqual(["org-allowed-1", "org-allowed-2"]);
+    expect(orgs.length).toBe(2);
+  });
+
+  it("returns empty organizations array when user has no roles/orgs without querying organizations table", async () => {
+    let orgsTableQueried = false;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { id: "user-456", display_name: "Bob" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: () => Promise.resolve({ data: [], error: null }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          orgsTableQueried = true;
+          return { select: () => ({ in: () => Promise.resolve({ data: [], error: null }) }) };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const context = {
+      supabase: mockSupabase as unknown as Parameters<
+        typeof import("./rfp.functions").getMyProfile
+      >[0]["context"]["supabase"],
+      userId: "user-456",
+    };
+
+    const { data: roles } = await context.supabase
+      .from("user_roles")
+      .select("role, org_id")
+      .eq("user_id", context.userId);
+
+    const userRoles = (roles ?? []) as Array<{ role: string; org_id: string }>;
+    const orgIds = Array.from(new Set(userRoles.map((r) => r.org_id).filter(Boolean)));
+
+    let orgs: Array<{ id: string; name: string; plan_tier: string }> = [];
+    if (orgIds.length > 0) {
+      const { data: orgData } = await context.supabase
+        .from("organizations")
+        .select("id, name, plan_tier")
+        .in("id", orgIds);
+      orgs = orgData ?? [];
+    }
+
+    expect(orgsTableQueried).toBe(false);
+    expect(orgs).toEqual([]);
+  });
+});

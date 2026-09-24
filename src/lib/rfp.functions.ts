@@ -10,14 +10,24 @@ export const getMyProfile = createServerFn({ method: "GET" })
       .select("*")
       .eq("id", context.userId)
       .single();
-    const { data: orgs } = await context.supabase
-      .from("organizations")
-      .select("id, name, plan_tier");
     const { data: roles } = await context.supabase
       .from("user_roles")
       .select("role, org_id")
       .eq("user_id", context.userId);
-    return { profile, orgs: orgs ?? [], roles: roles ?? [], userId: context.userId };
+
+    const userRoles = roles ?? [];
+    const orgIds = Array.from(new Set(userRoles.map((r) => r.org_id).filter(Boolean)));
+
+    let orgs: Array<{ id: string; name: string; plan_tier: string }> = [];
+    if (orgIds.length > 0) {
+      const { data: orgData } = await context.supabase
+        .from("organizations")
+        .select("id, name, plan_tier")
+        .in("id", orgIds);
+      orgs = orgData ?? [];
+    }
+
+    return { profile, orgs, roles: userRoles, userId: context.userId };
   });
 
 export const setRolePreview = createServerFn({ method: "POST" })
