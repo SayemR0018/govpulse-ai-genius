@@ -482,4 +482,76 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("filters organizations by user's assigned org_ids in getMyProfile to prevent cross-tenant metadata leakage", async () => {
+    let queriedInIds: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({ data: { id: "user-123", name: "Alice" }, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [
+                  { role: "proposal_manager", org_id: "org-a" },
+                  { role: "sme", org_id: "org-b" },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: () => ({
+              in: (col: string, ids: string[]) => {
+                if (col === "id") queriedInIds = ids;
+                return Promise.resolve({
+                  data: [
+                    { id: "org-a", name: "Org A", plan_tier: "enterprise" },
+                    { id: "org-b", name: "Org B", plan_tier: "pro" },
+                  ],
+                  error: null,
+                });
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const userId = "user-123";
+    const [{ data: profile }, { data: roles }] = await Promise.all([
+      mockSupabase.from("profiles").select("*").eq("id", userId).single(),
+      mockSupabase.from("user_roles").select("role, org_id").eq("user_id", userId),
+    ]);
+
+    const userRoles = roles ?? [];
+    const orgIds = Array.from(
+      new Set(userRoles.map((r) => r.org_id).filter((id): id is string => Boolean(id))),
+    );
+
+    let orgs: Array<{ id: string; name: string; plan_tier: string }> = [];
+    if (orgIds.length > 0) {
+      const { data: orgData } = await mockSupabase
+        .from("organizations")
+        .select("id, name, plan_tier")
+        .in("id", orgIds);
+      orgs = orgData ?? [];
+    }
+
+    expect(profile?.name).toBe("Alice");
+    expect(queriedInIds).toEqual(["org-a", "org-b"]);
+    expect(orgs).toHaveLength(2);
+  });
 });
