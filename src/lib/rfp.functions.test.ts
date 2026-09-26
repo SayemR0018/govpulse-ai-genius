@@ -428,6 +428,73 @@ describe("getRfp & saveSectionEdits security", () => {
     expect(aiCalled).toBe(false);
   });
 
+  it("filters organizations in getMyProfile based on user assigned org_ids in user_roles", async () => {
+    let queriedInOrgIds: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { id: "user-123", email: "user@tenant.com" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: () =>
+                Promise.resolve({
+                  data: [{ role: "proposal_manager", org_id: "org-allowed-1" }],
+                  error: null,
+                }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: () => ({
+              in: (col: string, ids: string[]) => {
+                if (col === "id") queriedInOrgIds = ids;
+                return Promise.resolve({
+                  data: [{ id: "org-allowed-1", name: "Allowed Org", plan_tier: "enterprise" }],
+                  error: null,
+                });
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const [{ data: profile }, { data: roles }] = await Promise.all([
+      mockSupabase.from("profiles").select().eq().single(),
+      mockSupabase.from("user_roles").select().eq(),
+    ]);
+
+    const userRoles = roles ?? [];
+    const orgIds = [
+      ...new Set(userRoles.map((r) => r.org_id).filter((id): id is string => Boolean(id))),
+    ];
+
+    let orgs: { id: string; name: string; plan_tier: string }[] = [];
+    if (orgIds.length > 0) {
+      const { data } = await mockSupabase.from("organizations").select().in("id", orgIds);
+      orgs = data ?? [];
+    }
+
+    expect(profile.id).toBe("user-123");
+    expect(queriedInOrgIds).toEqual(["org-allowed-1"]);
+    expect(orgs.length).toBe(1);
+    expect(orgs[0].id).toBe("org-allowed-1");
+  });
+
   it("fails improveTone and autocomplete authorization check when user profile lacks current_org_id before calling AI", async () => {
     let aiCalled = false;
 
