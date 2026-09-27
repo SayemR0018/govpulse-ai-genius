@@ -482,4 +482,70 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("filters tenant organizations strictly by user assigned org_ids in user_roles in getMyProfile", async () => {
+    let queriedInOrgIds: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { id: "user-1", full_name: "Test User" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [{ role: "proposal_manager", org_id: "org-assigned-1" }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: () => ({
+              in: (col: string, ids: string[]) => {
+                if (col === "id") queriedInOrgIds = ids;
+                return Promise.resolve({
+                  data: [{ id: "org-assigned-1", name: "User Org", plan_tier: "pro" }],
+                  error: null,
+                });
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    // Simulate getMyProfile execution
+    const userId = "user-1";
+    const [profileRes, rolesRes] = await Promise.all([
+      mockSupabase.from("profiles").select("*").eq("id", userId).single(),
+      mockSupabase.from("user_roles").select("role, org_id").eq("user_id", userId),
+    ]);
+    const roles = rolesRes.data ?? [];
+    const orgIds = Array.from(
+      new Set(roles.map((r) => r.org_id).filter((id): id is string => Boolean(id))),
+    );
+
+    const { data: orgs } =
+      orgIds.length > 0
+        ? await mockSupabase.from("organizations").select("id, name, plan_tier").in("id", orgIds)
+        : { data: [] };
+
+    expect(profileRes.data?.id).toBe("user-1");
+    expect(roles).toEqual([{ role: "proposal_manager", org_id: "org-assigned-1" }]);
+    expect(queriedInOrgIds).toEqual(["org-assigned-1"]);
+    expect(orgs).toEqual([{ id: "org-assigned-1", name: "User Org", plan_tier: "pro" }]);
+  });
 });

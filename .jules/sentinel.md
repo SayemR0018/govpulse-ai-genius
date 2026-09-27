@@ -9,3 +9,9 @@
 **Vulnerability:** Constructing static file paths via string concatenation (`./dist/client${url.pathname}`) in `Bun.file()` allows path traversal attacks (e.g., `/%2e%2e/server/server.js`) to read arbitrary files outside the client assets root directory.
 **Learning:** `Bun.file()` automatically resolves `..` relative path components. Unless `url.pathname` is URL-decoded and checked via `path.resolve(...)` against the base directory root (`.startsWith(baseDir + path.sep)`), relative traversal paths can escape `dist/client`.
 **Prevention:** Always decode URI components and resolve target paths using `path.resolve(baseDir, "." + decodedPath)` and verify `targetPath.startsWith(baseDir + path.sep) || targetPath === baseDir` before passing to `Bun.file()`.
+
+## 2025-05-20 - Scope Tenant Metadata Queries to Assigned User Organizations
+
+**Vulnerability:** Server function `getMyProfile` queried `organizations` without filtering by user `org_id`s, leaking organization metadata across tenants.
+**Learning:** Querying global tenant tables like `organizations` without explicit `.in("id", orgIds)` clause relies entirely on database RLS policy definitions which may be permissive or absent in edge/server SDK contexts.
+**Prevention:** Explicitly extract assigned `org_id`s from user role records (`user_roles`) and pass them to `.in("id", orgIds)` when querying tenant metadata in server functions.
