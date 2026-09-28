@@ -5,18 +5,20 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: profile } = await context.supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", context.userId)
-      .single();
-    const { data: orgs } = await context.supabase
-      .from("organizations")
-      .select("id, name, plan_tier");
-    const { data: roles } = await context.supabase
-      .from("user_roles")
-      .select("role, org_id")
-      .eq("user_id", context.userId);
+    const [{ data: profile }, { data: roles }] = await Promise.all([
+      context.supabase.from("profiles").select("*").eq("id", context.userId).single(),
+      context.supabase.from("user_roles").select("role, org_id").eq("user_id", context.userId),
+    ]);
+
+    const orgIds = Array.from(new Set((roles ?? []).map((r) => r.org_id).filter(Boolean)));
+    const { data: orgs } =
+      orgIds.length > 0
+        ? await context.supabase
+            .from("organizations")
+            .select("id, name, plan_tier")
+            .in("id", orgIds)
+        : { data: [] };
+
     return { profile, orgs: orgs ?? [], roles: roles ?? [], userId: context.userId };
   });
 

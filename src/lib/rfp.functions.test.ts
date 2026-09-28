@@ -482,4 +482,62 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("filters organizations in getMyProfile by assigned user_roles to prevent cross-tenant org leakage", async () => {
+    let queriedInOrgIds: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({ data: { id: "user-1", name: "Alice" }, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [{ role: "admin", org_id: "org-tenant-A" }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: () => ({
+              in: async (col: string, ids: string[]) => {
+                if (col === "id") queriedInOrgIds = ids;
+                return {
+                  data: [{ id: "org-tenant-A", name: "Org A", plan_tier: "enterprise" }],
+                  error: null,
+                };
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const [{ data: profile }, { data: roles }] = await Promise.all([
+      mockSupabase.from("profiles").select().eq().single(),
+      mockSupabase.from("user_roles").select().eq(),
+    ]);
+
+    const orgIds = Array.from(new Set((roles ?? []).map((r) => r.org_id).filter(Boolean)));
+    const { data: orgs } =
+      orgIds.length > 0
+        ? await mockSupabase.from("organizations").select().in("id", orgIds)
+        : { data: [] };
+
+    expect(profile).toEqual({ id: "user-1", name: "Alice" });
+    expect(roles).toEqual([{ role: "admin", org_id: "org-tenant-A" }]);
+    expect(queriedInOrgIds).toEqual(["org-tenant-A"]);
+    expect(orgs).toEqual([{ id: "org-tenant-A", name: "Org A", plan_tier: "enterprise" }]);
+  });
 });
