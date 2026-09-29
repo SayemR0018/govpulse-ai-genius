@@ -10,13 +10,24 @@ export const getMyProfile = createServerFn({ method: "GET" })
       .select("*")
       .eq("id", context.userId)
       .single();
-    const { data: orgs } = await context.supabase
-      .from("organizations")
-      .select("id, name, plan_tier");
     const { data: roles } = await context.supabase
       .from("user_roles")
       .select("role, org_id")
       .eq("user_id", context.userId);
+    const userOrgIds = Array.from(
+      new Set(
+        [...(roles ?? []).map((r) => r.org_id), profile?.current_org_id].filter(
+          (id): id is string => Boolean(id),
+        ),
+      ),
+    );
+    const { data: orgs } =
+      userOrgIds.length > 0
+        ? await context.supabase
+            .from("organizations")
+            .select("id, name, plan_tier")
+            .in("id", userOrgIds)
+        : { data: [] };
     return { profile, orgs: orgs ?? [], roles: roles ?? [], userId: context.userId };
   });
 
