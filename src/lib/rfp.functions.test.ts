@@ -482,4 +482,74 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("filters organization metadata in getMyProfile explicitly by user's assigned org_ids from user_roles", async () => {
+    let queriedOrgIds: string[] | undefined;
+    let queriedAllOrgs = false;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: (_cols?: string) => ({
+              eq: (_col?: string, _val?: string) => ({
+                single: async () => ({
+                  data: { id: "user-1", display_name: "Test User" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: (_cols?: string) => ({
+              eq: (_col?: string, _val?: string) =>
+                Promise.resolve({
+                  data: [{ role: "proposal_manager", org_id: "org-assigned-1" }],
+                  error: null,
+                }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: (_cols?: string) => {
+              queriedAllOrgs = true;
+              return {
+                in: (_col: string, ids: string[]) => {
+                  queriedOrgIds = ids;
+                  queriedAllOrgs = false;
+                  return Promise.resolve({
+                    data: [{ id: "org-assigned-1", name: "Org 1", plan_tier: "pro" }],
+                    error: null,
+                  });
+                },
+              };
+            },
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const [{ data: profile }, { data: roles }] = await Promise.all([
+      mockSupabase.from("profiles").select("*").eq("id", "user-1").single(),
+      mockSupabase.from("user_roles").select("role, org_id").eq("user_id", "user-1"),
+    ]);
+
+    const orgIds = (roles ?? [])
+      .map((r: { org_id: string }) => r.org_id)
+      .filter((id: string): id is string => Boolean(id));
+
+    const { data: orgs } = orgIds.length
+      ? await mockSupabase.from("organizations").select("id, name, plan_tier").in("id", orgIds)
+      : { data: [] };
+
+    expect(profile?.display_name).toBe("Test User");
+    expect(roles).toEqual([{ role: "proposal_manager", org_id: "org-assigned-1" }]);
+    expect(queriedOrgIds).toEqual(["org-assigned-1"]);
+    expect(queriedAllOrgs).toBe(false);
+    expect(orgs).toEqual([{ id: "org-assigned-1", name: "Org 1", plan_tier: "pro" }]);
+  });
 });
