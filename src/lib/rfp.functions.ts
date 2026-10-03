@@ -5,19 +5,21 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getMyProfile = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: profile } = await context.supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", context.userId)
-      .single();
-    const { data: orgs } = await context.supabase
-      .from("organizations")
-      .select("id, name, plan_tier");
-    const { data: roles } = await context.supabase
-      .from("user_roles")
-      .select("role, org_id")
-      .eq("user_id", context.userId);
-    return { profile, orgs: orgs ?? [], roles: roles ?? [], userId: context.userId };
+    const [profileRes, rolesRes] = await Promise.all([
+      context.supabase.from("profiles").select("*").eq("id", context.userId).single(),
+      context.supabase.from("user_roles").select("role, org_id").eq("user_id", context.userId),
+    ]);
+    const roles = rolesRes.data ?? [];
+    const orgIds = Array.from(new Set(roles.map((r) => r.org_id)));
+    // Scope organization metadata strictly to orgs assigned to the user to prevent cross-tenant data leakage
+    const { data: orgs } =
+      orgIds.length > 0
+        ? await context.supabase
+            .from("organizations")
+            .select("id, name, plan_tier")
+            .in("id", orgIds)
+        : { data: [] };
+    return { profile: profileRes.data, orgs: orgs ?? [], roles, userId: context.userId };
   });
 
 export const setRolePreview = createServerFn({ method: "POST" })
