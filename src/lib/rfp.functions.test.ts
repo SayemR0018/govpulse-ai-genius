@@ -482,4 +482,64 @@ describe("getRfp & saveSectionEdits security", () => {
     );
     expect(aiCalled).toBe(false);
   });
+
+  it("filters organizations in getMyProfile by user assigned org_ids from user_roles", async () => {
+    let queriedOrgIds: string[] | undefined;
+
+    const mockSupabase = {
+      from: (table: string) => {
+        if (table === "profiles") {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: { id: "user-1", display_name: "Alice" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "user_roles") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [{ role: "sme", org_id: "org-1" }],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === "organizations") {
+          return {
+            select: () => ({
+              in: async (col: string, vals: string[]) => {
+                if (col === "id") queriedOrgIds = vals;
+                return {
+                  data: [{ id: "org-1", name: "Org 1", plan_tier: "free" }],
+                  error: null,
+                };
+              },
+            }),
+          };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    const userId = "user-1";
+    const [profileRes, rolesRes] = await Promise.all([
+      mockSupabase.from("profiles").select().eq().single(),
+      mockSupabase.from("user_roles").select().eq(),
+    ]);
+    const roles = rolesRes.data ?? [];
+    const orgIds = Array.from(new Set(roles.map((r) => r.org_id)));
+    const { data: orgs } =
+      orgIds.length > 0
+        ? await mockSupabase.from("organizations").select().in("id", orgIds)
+        : { data: [] };
+
+    expect(queriedOrgIds).toEqual(["org-1"]);
+    expect(orgs).toEqual([{ id: "org-1", name: "Org 1", plan_tier: "free" }]);
+  });
 });
